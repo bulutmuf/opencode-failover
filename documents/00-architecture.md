@@ -116,7 +116,7 @@ together implement failover without owning the provider:
   `event.type === "session.error"`, reads `event.properties.error` (a
   `SessionV1.APIError` shape with `statusCode`, `responseHeaders`,
   `responseBody`, `message`), classifies it, and mutates the key pool.
-- **`tool`** — a single tool `keychain.status` is registered so the LLM and
+- **`tool`** — a single tool `keychain-status` is registered so the LLM and
   the TUI slash command surface can inspect live key state.
 
 ## Why not the `provider` hook

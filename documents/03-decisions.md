@@ -144,13 +144,13 @@ entirely.
 | Less memory | Operator cannot see what went wrong |
 
 **Option B: Mark as disabled (chosen)** — keys stay in pool with
-`status: "disabled"`, visible via `keychain.status`.
+`status: "disabled"`, visible via `keychain-status`.
 
 | Pros | Cons |
 |---|---|
 | Operator can see disabled keys | Slightly more memory |
 | Debugging is easier | Pool grows over time |
-| `keychain.status` shows full picture | Negligible for typical pool sizes |
+| `keychain-status` shows full picture | Negligible for typical pool sizes |
 
 **Decision**: Mark as disabled. The visibility benefit outweighs the
 negligible memory cost for typical API key pools (2-10 keys).

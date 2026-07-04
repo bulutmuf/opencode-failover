@@ -118,7 +118,7 @@ B is now active with consecutiveErrors=0.
 
 - 429 / 5xx / overload patterns → quarantine (transient).
 - 401 / 403 / 402 → permanent disable (auth/billing). Disabled keys never
-  return to rotation; they are reported by `keychain.status` so an operator
+  return to rotation; they are reported by `keychain-status` so an operator
   can investigate.
 
 ## Edge cases

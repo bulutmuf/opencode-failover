@@ -13,11 +13,11 @@ attempt, not the current retry cycle.
 
 **Fix**: Wait for the current retry cycle to complete. The next request will
 use a different key. If 429 persists, the key may need a longer quarantine
-— check `keychain.status` for the quarantine timer.
+— check `keychain-status` for the quarantine timer.
 
 ## All keys disabled (401/403)
 
-**Symptom**: `keychain.status` shows all keys as DISABLED.
+**Symptom**: `keychain-status` shows all keys as DISABLED.
 
 **Cause**: All configured API keys are invalid, revoked, or lack permissions.
 
@@ -80,7 +80,7 @@ configured.
 **Possible causes**:
 
 1. **providerID mismatch**: The model's `providerID` does not match the
-   configured provider ID. Fix: run `keychain.status` to see which providers
+   configured provider ID. Fix: run `keychain-status` to see which providers
    are configured, and compare with your model's provider ID.
 
 2. **Single key**: Only one key is configured — rotation has nothing to
@@ -138,5 +138,5 @@ Output format:
   (O(1) array access) and one `classify()` call per error event.
 - No network calls — all state is in-memory.
 - No file I/O — config is read once at startup from env/options.
-- The `keychain.status` tool does a linear scan of the pool (negligible for
+- The `keychain-status` tool does a linear scan of the pool (negligible for
   typical 2-10 key pools).

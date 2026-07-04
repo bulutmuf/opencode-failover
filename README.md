@@ -85,7 +85,7 @@ One provider, multiple keys, zero downtime.
 - Permanent disable on auth errors (401/403) and billing errors (402)
 - Temporary quarantine on server errors (5xx)
 - Rate-limit pattern detection ([Anthropic](https://docs.anthropic.com), [OpenAI](https://platform.openai.com/docs), and generic patterns)
-- [`keychain.status`](#tools-llm-natural-language) tool for real-time key monitoring
+- [`keychain-status`](#tools-llm-natural-language) tool for real-time key monitoring
 - Debug logging via `OPENCODE_FAILOVER_DEBUG=1`
 - Works with any [OpenCode](https://opencode.ai)-compatible provider
 
@@ -232,9 +232,9 @@ These are tools the LLM can call. Say them in natural language:
 
 | Tool | What to say | Description |
 |------|-------------|-------------|
-| `keychain.setup` | "Add these API keys for nvidia: key1, key2" | Save API keys for a provider to `.env` |
-| `keychain.remove` | "Remove all nvidia API keys" | Remove API keys for a provider from `.env` |
-| `keychain.status` | "Show me the keychain status" | Show all configured keys, their status, weights, and retry timers |
+| `keychain-setup` | "Add these API keys for nvidia: key1, key2" | Save API keys for a provider to `.env` |
+| `keychain-remove` | "Remove all nvidia API keys" | Remove API keys for a provider from `.env` |
+| `keychain-status` | "Show me the keychain status" | Show all configured keys, their status, weights, and retry timers |
 
 Example output:
 
