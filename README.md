@@ -15,6 +15,10 @@
   <img src="https://img.shields.io/badge/Test-28%2F28-4CAF50?style=flat-square" alt="Tests">
 </p>
 
+<p align="center">
+  <video src="https://github.com/bulutmuf/opencode-failover/raw/main/demo.mp4" controls autoplay loop muted width="800"></video>
+</p>
+
 ---
 
 **opencode-failover** is a [OpenCode](https://opencode.ai) plugin that automatically rotates API keys across multiple provider credentials. When a key hits a rate limit, the plugin quarantines it and switches to the next available key -- zero downtime, zero manual intervention.
