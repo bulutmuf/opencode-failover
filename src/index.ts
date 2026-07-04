@@ -79,7 +79,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
             const disabled = keys.filter((k) => k.status === "disabled").length
             lines.push(`  [${active} active, ${quarantined} quarantined, ${disabled} disabled]`)
           }
-          return lines.join("\n") || "No providers configured. Add keys by telling me: 'Add these API keys for <provider>: <key1>, <key2>'"
+          return lines.join("\n") || "opencode-failover: No providers configured. Add keys by telling me: 'Add these API keys for <provider>: <key1>, <key2>'"
         },
       }),
 
@@ -93,7 +93,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           const envPath = envFilePath(input.directory)
           const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
           const keyList = keys.split(",").map((k) => k.trim()).filter(Boolean)
-          if (keyList.length === 0) return "No valid keys provided."
+          if (keyList.length === 0) return "opencode-failover: No valid keys provided."
           await writeEnvKey(envPath, envKey, keyList.join(","))
           Bun.env[envKey] = keyList.join(",")
           const poolIds = pool.allProviderIDs()
@@ -107,7 +107,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
               variant: "success",
             },
           })
-          return `Saved ${keyList.length} key(s) for ${provider} to ${envPath}. Restart OpenCode to apply.`
+          return `opencode-failover: Saved ${keyList.length} key(s) for ${provider} to ${envPath}. Restart OpenCode to apply.`
         },
       }),
 
@@ -128,7 +128,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
               variant: removed ? "success" : "info",
             },
           })
-          return removed ? `Removed ${provider} keys from ${envPath}. Restart OpenCode to apply.` : `No keys found for ${provider} in ${envPath}.`
+          return removed ? `opencode-failover: Removed ${provider} keys from ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${provider} in ${envPath}.`
         },
       }),
     },
