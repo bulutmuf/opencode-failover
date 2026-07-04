@@ -30,21 +30,41 @@
 opencode plugin opencode-failover
 ```
 
-Set your API keys (create a `.env` file in your project root):
+Set your API keys. Ask the LLM in the TUI (natural language):
+
+> Add these NVIDIA API keys for failover rotation: nvapi-xxx, nvapi-yyy, nvapi-zzz
+
+The plugin saves keys to `.env` and restarts opencode to activate.
+
+Or create `.env` manually:
 
 ```bash
 NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"
 ```
 
-Or use the interactive tool in the TUI:
-
-```
-/keychain.setup provider=nvidia keys=nvapi-xxx,nvapi-yyy,nvapi-zzz
-```
-
 Restart OpenCode. The plugin activates automatically and begins rotating keys.
 
-## Why This Works
+## Quick Prompt (copy & paste)
+
+Open the opencode TUI and send this to the LLM:
+
+```
+Add these NVIDIA API keys for failover rotation: nvapi-key1, nvapi-key2, nvapi-key3
+```
+
+The plugin saves them to `.env`. Restart opencode and it starts rotating automatically.
+
+To check key status later, ask:
+
+```
+Show me the keychain status
+```
+
+To remove keys:
+
+```
+Remove all NVIDIA API keys from the keychain
+```
 
 Most LLM providers enforce per-key rate limits. When you hit the limit, requests fail and you are stuck waiting.
 
@@ -65,7 +85,7 @@ One provider, multiple keys, zero downtime.
 - Permanent disable on auth errors (401/403) and billing errors (402)
 - Temporary quarantine on server errors (5xx)
 - Rate-limit pattern detection ([Anthropic](https://docs.anthropic.com), [OpenAI](https://platform.openai.com/docs), and generic patterns)
-- [`/keychain.status`](#commands) command for real-time key monitoring
+- [`keychain.status`](#tools-llm-natural-language) tool for real-time key monitoring
 - Debug logging via `OPENCODE_FAILOVER_DEBUG=1`
 - Works with any [OpenCode](https://opencode.ai)-compatible provider
 
@@ -206,13 +226,15 @@ Request    -->  Plugin picks next key (weighted round-robin)
 
 If the provider returns a `retry-after` header, that value overrides the schedule.
 
-## Commands
+## Tools (LLM natural language)
 
-| Command | Description |
-|---------|-------------|
-| `/keychain.setup` | Save API keys for a provider to the `.env` file |
-| `/keychain.remove` | Remove API keys for a provider from the `.env` file |
-| `/keychain.status` | Show all configured keys, their status, weights, and retry timers |
+These are tools the LLM can call. Say them in natural language:
+
+| Tool | What to say | Description |
+|------|-------------|-------------|
+| `keychain.setup` | "Add these API keys for nvidia: key1, key2" | Save API keys for a provider to `.env` |
+| `keychain.remove` | "Remove all nvidia API keys" | Remove API keys for a provider from `.env` |
+| `keychain.status` | "Show me the keychain status" | Show all configured keys, their status, weights, and retry timers |
 
 Example output:
 

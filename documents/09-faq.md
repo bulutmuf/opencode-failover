@@ -6,13 +6,11 @@ Three ways, in order of convenience:
 
 ### 1. Interactive tool (recommended)
 
-In the opencode TUI, ask the LLM or run:
+In the opencode TUI, ask the LLM in natural language:
 
-```
-/keychain.setup provider=nvidia keys=nvapi-xxx,nvapi-yyy,nvapi-zzz
-```
+> Add these NVIDIA API keys for failover rotation: nvapi-xxx, nvapi-yyy, nvapi-zzz
 
-This writes to the `.env` file and restarts opencode.
+The plugin saves keys to `.env` and prompts you to restart.
 
 ### 2. .env file
 
@@ -180,13 +178,9 @@ initialization.
 
 ### How do I check key status?
 
-Use the `keychain.status` tool from the TUI:
+Ask the LLM in the TUI:
 
-```
-/keychain.status
-```
-
-Or ask the LLM: "Show me the keychain status"
+> Show me the keychain status
 
 ### What does "quarantined" mean?
 
