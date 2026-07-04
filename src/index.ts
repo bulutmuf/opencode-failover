@@ -130,11 +130,11 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           log(input, `removed keys for ${provider}`, { provider })
           await input.client.tui.showToast({
             body: {
-              message: removed ? `Removed ${provider} keys. Restart OpenCode to apply.` : `No keys found for ${provider}.`,
+              message: removed ? `Removed ${provider} key(s). Restart OpenCode to apply.` : `No keys found for ${provider}.`,
               variant: removed ? "success" : "info",
             },
           })
-          return removed ? `opencode-failover: Removed ${provider} keys from ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${provider} in ${envPath}.`
+          return removed ? `opencode-failover: Removed ${provider} key(s) from ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${provider} in ${envPath}.`
         },
       }),
     },
