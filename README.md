@@ -3,23 +3,16 @@
 [OpenCode](https://opencode.ai) plugin for automatic API-key failover and rotation across multiple provider keys.
 
 <p>
-  <a href="https://www.npmjs.com/package/opencode-failover"><img src="https://img.shields.io/npm/v/opencode-failover?style=flat-square&color=blue" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/opencode-failover"><img src="https://img.shields.io/npm/dm/opencode-failover?style=flat-square&color=blue" alt="npm downloads"></a>
-  <a href="https://github.com/bulutmuf/opencode-failover/blob/main/LICENSE"><img src="https://img.shields.io/github/license/bulutmuf/opencode-failover?style=flat-square" alt="License"></a>
-  <a href="https://github.com/bulutmuf/opencode-failover/actions"><img src="https://img.shields.io/github/actions/workflow/status/bulutmuf/opencode-failover/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"></a>
-  <a href="https://github.com/bulutmuf/opencode-failover/stargazers"><img src="https://img.shields.io/github/stars/bulutmuf/opencode-failover?style=flat-square" alt="Stars"></a>
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square&logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/Bun-1.0+-FBF0DF?style=flat-square&logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/OpenCode-1.17+-FF6B35?style=flat-square" alt="OpenCode">
-  <a href="https://github.com/bulutmuf/opencode-failover/issues"><img src="https://img.shields.io/github/issues/bulutmuf/opencode-failover?style=flat-square" alt="Issues"></a>
   <img src="https://img.shields.io/badge/Test-28%2F28-4CAF50?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License">
 </p>
 
 <p align="center">
   <img src="assets/demo.gif" alt="opencode-failover demo" width="800">
 </p>
-
----
 
 **opencode-failover** is a [OpenCode](https://opencode.ai) plugin that automatically rotates API keys across multiple provider credentials. When a key hits a rate limit, the plugin quarantines it and switches to the next available key -- zero downtime, zero manual intervention.
 
