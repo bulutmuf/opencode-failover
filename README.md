@@ -66,6 +66,12 @@ To remove keys:
 Remove all NVIDIA API keys from the keychain
 ```
 
+Or remove a specific key:
+
+```
+Remove nvapi-key1 from NVIDIA
+```
+
 Most LLM providers enforce per-key rate limits. When you hit the limit, requests fail and you are stuck waiting.
 
 opencode-failover solves this by:
@@ -232,8 +238,8 @@ These are tools the LLM can call. Say them in natural language:
 
 | Tool | What to say | Description |
 |------|-------------|-------------|
-| `keychain-setup` | "Add these API keys for nvidia: key1, key2" | Save API keys for a provider to `.env` |
-| `keychain-remove` | "Remove all nvidia API keys" | Remove API keys for a provider from `.env` |
+| `keychain-setup` | "Add these API keys for nvidia: key1, key2" | Save API keys for a provider to `.env` (appends to existing) |
+| `keychain-remove` | "Remove all nvidia API keys" or "Remove key1 from nvidia" | Remove all or specific API keys for a provider from `.env` |
 | `keychain-status` | "Show me the keychain status" | Show all configured keys, their status, weights, and retry timers |
 
 Example output:

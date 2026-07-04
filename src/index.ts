@@ -142,25 +142,53 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       }),
 
       "keychain-remove": tool({
-        description: "opencode-failover: Remove all API keys for a provider from the .env file. CALL THIS when the user wants to remove, delete, or clear API keys for a provider. Requires: provider (string).",
+        description: "opencode-failover: Remove API keys for a provider. CALL THIS when the user wants to remove, delete, or clear API keys. Without 'key' arg: removes ALL keys for the provider. With 'key' arg: removes only the specified key(s).",
         args: {
-          provider: tool.schema.string().describe("Provider name to remove keys for, e.g. nvidia, openrouter"),
+          provider: tool.schema.string().describe("Provider name, e.g. nvidia, openrouter"),
+          key: tool.schema.string().optional().describe("Optional: specific key(s) to remove, comma-separated. If omitted, removes ALL keys for the provider."),
         },
-        async execute({ provider }) {
+        async execute({ provider, key }) {
           const envPath = envFilePath(input.directory)
           const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
           const existingRaw = Bun.env[envKey]
-          const existingCount = existingRaw ? existingRaw.split(",").map((k) => k.trim()).filter(Boolean).length : 0
+          const existingKeys = existingRaw ? existingRaw.split(",").map((k) => k.trim()).filter(Boolean) : []
+          if (existingKeys.length === 0) {
+            await input.client.tui.showToast({
+              body: { message: `No keys found for ${displayName(provider)}.`, variant: "info" },
+            })
+            return `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
+          }
+          if (key) {
+            const toRemove = key.split(",").map((k) => k.trim()).filter(Boolean)
+            const remaining = existingKeys.filter((k) => !toRemove.includes(k))
+            if (remaining.length === existingKeys.length) {
+              await input.client.tui.showToast({
+                body: { message: `Key(s) not found for ${displayName(provider)}.`, variant: "info" },
+              })
+              return `opencode-failover: Specified key(s) not found for ${displayName(provider)} in ${envPath}.`
+            }
+            if (remaining.length === 0) {
+              await removeEnvKey(envPath, envKey)
+              delete Bun.env[envKey]
+            } else {
+              await writeEnvKey(envPath, envKey, remaining.join(","))
+              Bun.env[envKey] = remaining.join(",")
+            }
+            pool.register(provider, { keys: remaining, header: "Authorization", scheme: "Bearer" })
+            const removedCount = existingKeys.length - remaining.length
+            log(input, `removed ${removedCount} key(s) from ${provider} (total remaining: ${remaining.length})`, { provider, removed: removedCount, remaining: remaining.length })
+            await input.client.tui.showToast({
+              body: { message: `Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining. Restart OpenCode to apply.`, variant: "success" },
+            })
+            return `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining in ${envPath}. Restart OpenCode to apply.`
+          }
           const removed = await removeEnvKey(envPath, envKey)
           delete Bun.env[envKey]
-          log(input, `removed ${existingCount} key(s) for ${provider}`, { provider, count: existingCount })
+          log(input, `removed all ${existingKeys.length} key(s) for ${provider}`, { provider, count: existingKeys.length })
           await input.client.tui.showToast({
-            body: {
-              message: removed ? `Removed ${existingCount} key(s) from ${displayName(provider)}. Restart OpenCode to apply.` : `No keys found for ${displayName(provider)}.`,
-              variant: removed ? "success" : "info",
-            },
+            body: { message: removed ? `Removed all ${existingKeys.length} key(s) from ${displayName(provider)}. Restart OpenCode to apply.` : `No keys found for ${displayName(provider)}.`, variant: removed ? "success" : "info" },
           })
-          return removed ? `opencode-failover: Removed ${existingCount} key(s) from ${displayName(provider)} in ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
+          return removed ? `opencode-failover: Removed all ${existingKeys.length} key(s) from ${displayName(provider)} in ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
         },
       }),
     },
