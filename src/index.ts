@@ -122,22 +122,22 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
         async execute({ provider, keys }) {
           const envPath = envFilePath(input.directory)
           const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
-          const keyList = keys.split(",").map((k) => k.trim()).filter(Boolean)
-          if (keyList.length === 0) return "opencode-failover: No valid keys provided."
-          await writeEnvKey(envPath, envKey, keyList.join(","))
-          Bun.env[envKey] = keyList.join(",")
-          const poolIds = pool.allProviderIDs()
-          if (!poolIds.includes(provider)) {
-            pool.register(provider, { keys: keyList, header: "Authorization", scheme: "Bearer" })
-          }
-          log(input, `saved ${keyList.length} keys for ${provider}`, { provider, count: keyList.length })
+          const newKeys = keys.split(",").map((k) => k.trim()).filter(Boolean)
+          if (newKeys.length === 0) return "opencode-failover: No valid keys provided."
+          const existingRaw = Bun.env[envKey]
+          const existingKeys = existingRaw ? existingRaw.split(",").map((k) => k.trim()).filter(Boolean) : []
+          const merged = [...new Set([...existingKeys, ...newKeys])]
+          await writeEnvKey(envPath, envKey, merged.join(","))
+          Bun.env[envKey] = merged.join(",")
+          pool.register(provider, { keys: merged, header: "Authorization", scheme: "Bearer" })
+          log(input, `saved ${newKeys.length} key(s) for ${provider} (total: ${merged.length})`, { provider, added: newKeys.length, total: merged.length })
           await input.client.tui.showToast({
             body: {
-              message: `Saved ${keyList.length} key(s) for ${displayName(provider)}. Restart OpenCode to apply.`,
+              message: `Saved ${newKeys.length} key(s) for ${displayName(provider)}. Total: ${merged.length} key(s). Restart OpenCode to apply.`,
               variant: "success",
             },
           })
-          return `opencode-failover: Saved ${keyList.length} key(s) for ${displayName(provider)} to ${envPath}. Restart OpenCode to apply.`
+          return `opencode-failover: Saved ${newKeys.length} key(s) for ${displayName(provider)}. Total: ${merged.length} key(s) in ${envPath}. Restart OpenCode to apply.`
         },
       }),
 
@@ -149,16 +149,18 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
         async execute({ provider }) {
           const envPath = envFilePath(input.directory)
           const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
+          const existingRaw = Bun.env[envKey]
+          const existingCount = existingRaw ? existingRaw.split(",").map((k) => k.trim()).filter(Boolean).length : 0
           const removed = await removeEnvKey(envPath, envKey)
           delete Bun.env[envKey]
-          log(input, `removed keys for ${provider}`, { provider })
+          log(input, `removed ${existingCount} key(s) for ${provider}`, { provider, count: existingCount })
           await input.client.tui.showToast({
             body: {
-              message: removed ? `Removed ${displayName(provider)} key(s). Restart OpenCode to apply.` : `No keys found for ${displayName(provider)}.`,
+              message: removed ? `Removed ${existingCount} key(s) from ${displayName(provider)}. Restart OpenCode to apply.` : `No keys found for ${displayName(provider)}.`,
               variant: removed ? "success" : "info",
             },
           })
-          return removed ? `opencode-failover: Removed ${displayName(provider)} key(s) from ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
+          return removed ? `opencode-failover: Removed ${existingCount} key(s) from ${displayName(provider)} in ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
         },
       }),
     },
