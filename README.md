@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Bun-1.0+-FBF0DF?style=flat-square&logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/OpenCode-1.17+-FF6B35?style=flat-square" alt="OpenCode">
   <a href="https://github.com/bulutmuf/opencode-failover/issues"><img src="https://img.shields.io/github/issues/bulutmuf/opencode-failover?style=flat-square" alt="Issues"></a>
-  <img src="https://img.shields.io/badge/Test-21%2F21-4CAF50?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/Test-28%2F28-4CAF50?style=flat-square" alt="Tests">
 </p>
 
 ---
@@ -287,6 +287,7 @@ src/
   classify.ts       Error classifier: status/body -> action
   state.test.ts     7 tests for rotation and quarantine
   classify.test.ts  14 tests for error classification
+  config.test.ts    7 tests for env provider discovery
 documents/
   00-architecture.md
   01-error-patterns.md
