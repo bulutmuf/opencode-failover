@@ -1,5 +1,3 @@
-import { KeyPool } from "./state.ts"
-
 export enum ErrorAction {
   Rotate = "rotate",
   Disable = "disable",
@@ -30,12 +28,12 @@ export function classify(raw: unknown): ClassifierResult {
 
   const retryAfterMs = parseRetryAfter(headers as Record<string, string>)
 
-  if (status === 429 || status === 402 || is429Overloaded(body, message)) {
+  if (status === 429 || is429Overloaded(body, message)) {
     return { action: ErrorAction.Rotate, retryAfterMs, reason: `Rate limited (${status})` }
   }
 
-  if (status === 401 || status === 403) {
-    return { action: ErrorAction.Disable, retryAfterMs: null, reason: `Auth failed (${status})` }
+  if (status === 401 || status === 403 || status === 402) {
+    return { action: ErrorAction.Disable, retryAfterMs: null, reason: `Auth/billing failed (${status})` }
   }
 
   if (status >= 500 && status < 600) {
