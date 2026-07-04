@@ -39,8 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Configuration**: Three config sources with precedence:
   1. `OPENCODE_FAILOVER_PROVIDERS` env (JSON map)
-  2. `<ID>_API_KEYS` env (comma list) + options merge
-  3. `opencode.json` plugin options
+  2. `<ID>_API_KEYS` env (comma list) — auto-discovered at startup
+  3. `opencode.json` plugin options (merged with env keys)
 
 - **Debug mode**: `OPENCODE_FAILOVER_DEBUG=1` logs key injection and
   quarantine decisions via opencode's internal logging.
@@ -48,8 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Provider support**: Works with any OpenAI-compatible provider (NVIDIA NIM,
   OpenRouter, Anthropic, OpenAI, custom/self-hosted).
 
-- **Tests**: 21 table-driven tests covering rotation, quarantine, error
-  classification, and edge cases.
+- **Tests**: 28 table-driven tests covering rotation, quarantine, error
+  classification, config discovery, and edge cases.
 
 - **CI/CD**: GitHub Actions workflow for `bun test` + `bun run typecheck` on
   push/PR, npm publish on `v*` tags.
