@@ -1,0 +1,6 @@
+assets/
+documents/
+.github/
+*.test.ts
+tsconfig.json
+bun.lock
