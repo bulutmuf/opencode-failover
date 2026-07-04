@@ -6,7 +6,6 @@
   <a href="https://www.npmjs.com/package/opencode-failover"><img src="https://img.shields.io/npm/v/opencode-failover?style=flat-square&color=blue" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/opencode-failover"><img src="https://img.shields.io/npm/dm/opencode-failover?style=flat-square&color=blue" alt="npm downloads"></a>
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License">
-  <a href="https://github.com/bulutmuf/opencode-failover/actions"><img src="https://img.shields.io/github/actions/workflow/status/bulutmuf/opencode-failover/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"></a>
   <a href="https://github.com/bulutmuf/opencode-failover/stargazers"><img src="https://img.shields.io/github/stars/bulutmuf/opencode-failover?style=flat-square" alt="Stars"></a>
   <img src="https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square&logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/Bun-1.0+-FBF0DF?style=flat-square&logo=bun" alt="Bun">
