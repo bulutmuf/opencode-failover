@@ -184,6 +184,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           }
           const removed = await removeEnvKey(envPath, envKey)
           delete Bun.env[envKey]
+          pool.register(provider, { keys: [], header: "Authorization", scheme: "Bearer" })
           log(input, `removed all ${existingKeys.length} key(s) for ${provider}`, { provider, count: existingKeys.length })
           await input.client.tui.showToast({
             body: { message: removed ? `Removed all ${existingKeys.length} key(s) from ${displayName(provider)}.` : `No keys found for ${displayName(provider)}.`, variant: removed ? "success" : "info" },
