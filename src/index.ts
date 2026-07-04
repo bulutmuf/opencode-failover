@@ -17,7 +17,7 @@ function log(input: PluginInput, message: string, extra?: Record<string, unknown
   })
 }
 
-export default async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks> {
+async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks> {
   const pool = new KeyPool()
 
   for (const providerID of providerIDs(opts)) {
@@ -123,3 +123,5 @@ function containsAuthError(error: Record<string, unknown>, headerValue: string):
   const key = headerValue.toLowerCase()
   return combined.includes(key)
 }
+
+export default failoverPlugin
