@@ -36,6 +36,12 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       for (const [key, value] of envVars) {
         if (!Bun.env[key]) Bun.env[key] = value
       }
+      for (const providerID of providerIDs(opts)) {
+        if (!pool.allProviderIDs().includes(providerID)) {
+          const config = loadProviderConfig(providerID, opts)
+          if (config) pool.register(providerID, config)
+        }
+      }
     },
 
     "chat.headers": async (incoming, output) => {
