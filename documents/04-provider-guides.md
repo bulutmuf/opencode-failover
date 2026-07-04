@@ -6,7 +6,20 @@ NVIDIA NIM uses OpenAI-compatible API with `Authorization: Bearer <key>`.
 
 ### Configuration
 
-**Option 1: env vars**
+**Option 1: .env file (recommended)**
+
+```bash
+# Run in opencode TUI, or create manually:
+/keychain.setup provider=nvidia keys=nvapi-xxx,nvapi-yyy,nvapi-zzz
+```
+
+Or create `.env` in your project root:
+
+```bash
+NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"
+```
+
+**Option 2: shell env vars**
 
 ```bash
 NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"

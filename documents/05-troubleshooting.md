@@ -43,12 +43,51 @@ use a different key. If 429 persists, the key may need a longer quarantine
    the provider ID (e.g., `"nvidia"`, `"openrouter"`, `"anthropic"`).
 
 3. **No keys configured**: The plugin loads but finds no keys for the
-   requested provider. Fix: ensure at least one key is configured for each
-   provider you use.
+   requested provider. Fix: use `/keychain.setup` to add keys, or create a
+   `.env` file with `{PROVIDER}_API_KEYS=key1,key2`.
 
 4. **Plugin not in opencode.json**: The plugin is installed but not listed
    in the `"plugin"` array. Fix: add `"opencode-failover"` to the plugin
    list.
+
+5. **.env file not in project root**: The plugin reads `.env` from the
+   project directory. Fix: ensure `.env` is at the same level as
+   `opencode.json`, or set `OPENCODE_FAILOVER_ENV_FILE` to a custom path.
+
+## Startup warning: "Missing keys for..."
+
+**Symptom**: A toast notification appears at startup saying keys are missing.
+
+**Cause**: The plugin detected a configured provider with no keys. This
+happens when:
+- The provider is listed in `opencode.json` options but has no `keys` array.
+- The environment variable (e.g., `NVIDIA_API_KEYS`) is not set.
+- The `.env` file doesn't contain the expected key.
+
+**Fix**: Use `/keychain.setup` to add keys, or create a `.env` file:
+
+```bash
+NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy"
+```
+
+Restart opencode after adding keys.
+
+## .env file not being read
+
+**Symptom**: Keys in `.env` file are not picked up by the plugin.
+
+**Possible causes**:
+
+1. **File not in project root**: The plugin reads `.env` from the project
+   directory (where `opencode.json` lives). Fix: move `.env` to the correct
+   location, or set `OPENCODE_FAILOVER_ENV_FILE=/path/to/.env`.
+
+2. **Wrong key format**: The `.env` file must use `{PROVIDER}_API_KEYS=...`
+   format. Fix: check the key name matches the provider ID (e.g.,
+   `NVIDIA_API_KEYS` for provider `nvidia`).
+
+3. **Shell env overrides .env**: If the same key is set as a shell env var,
+   the shell value takes precedence. Fix: unset the shell var or update it.
 
 ## Rotation not working (same key used every time)
 

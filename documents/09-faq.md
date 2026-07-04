@@ -1,5 +1,51 @@
 # 09 — Frequently asked questions
 
+## How do I add API keys?
+
+Three ways, in order of convenience:
+
+### 1. Interactive tool (recommended)
+
+In the opencode TUI, ask the LLM or run:
+
+```
+/keychain.setup provider=nvidia keys=nvapi-xxx,nvapi-yyy,nvapi-zzz
+```
+
+This writes to the `.env` file and restarts opencode.
+
+### 2. .env file
+
+Create `.env` in your project root:
+
+```bash
+NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"
+OPENROUTER_API_KEYS="sk-or-v1-xxx,sk-or-v1-yyy"
+```
+
+Restart opencode. The plugin reads `.env` at startup.
+
+### 3. Shell environment variables
+
+```bash
+export NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy"
+opencode
+```
+
+### 4. opencode.json options
+
+```json
+{
+  "plugin": [["opencode-failover", {
+    "providers": {
+      "nvidia": { "keys": ["nvapi-xxx", "nvapi-yyy"] }
+    }
+  }]]
+}
+```
+
+**Precedence**: Shell env > .env file > opencode.json options.
+
 ## Provider compatibility
 
 ### Which providers are supported?
