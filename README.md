@@ -30,10 +30,16 @@
 opencode plugin opencode-failover
 ```
 
-Set your API keys:
+Set your API keys (create a `.env` file in your project root):
 
 ```bash
-export NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"
+NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"
+```
+
+Or use the interactive tool in the TUI:
+
+```
+/keychain.setup provider=nvidia keys=nvapi-xxx,nvapi-yyy,nvapi-zzz
 ```
 
 Restart OpenCode. The plugin activates automatically and begins rotating keys.
@@ -204,6 +210,8 @@ If the provider returns a `retry-after` header, that value overrides the schedul
 
 | Command | Description |
 |---------|-------------|
+| `/keychain.setup` | Save API keys for a provider to the `.env` file |
+| `/keychain.remove` | Remove API keys for a provider from the `.env` file |
 | `/keychain.status` | Show all configured keys, their status, weights, and retry timers |
 
 Example output:
