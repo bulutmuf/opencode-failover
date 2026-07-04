@@ -1,4 +1,5 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import { tool } from "@opencode-ai/plugin"
 import { validateProviderConfig, providerIDs } from "./config.ts"
 import { KeyPool } from "./state.ts"
 import { classify, ErrorAction } from "./classify.ts"
@@ -43,6 +44,35 @@ export default async function failoverPlugin(input: PluginInput, opts?: unknown)
           sessionID: incoming.sessionID,
         })
       }
+    },
+
+    tool: {
+      "keychain.status": tool({
+        description: "Show the current state of all configured API keys: active, quarantined, disabled, weights, and retry timers",
+        args: {},
+        async execute() {
+          const lines: string[] = []
+          for (const providerID of pool.allProviderIDs()) {
+            const keys = pool.status(providerID)
+            lines.push(`## ${providerID}`)
+            for (const k of keys) {
+              const masked = k.key.length > 7 ? `${k.key.slice(0, 4)}...${k.key.slice(-3)}` : "<key>"
+              const weight = k.weight > 1 ? ` [w=${k.weight}]` : ""
+              const status = k.status === "quarantined"
+                ? `QUARANTINED until ${k.quarantinedUntil ? new Date(k.quarantinedUntil).toISOString() : "now"}`
+                : k.status === "disabled"
+                  ? `DISABLED: ${k.lastErrorMessage || "unknown"}`
+                  : "active"
+              lines.push(`  ${masked}${weight} — ${status}`)
+            }
+            const active = keys.filter((k) => k.status === "active").length
+            const quarantined = keys.filter((k) => k.status === "quarantined").length
+            const disabled = keys.filter((k) => k.status === "disabled").length
+            lines.push(`  [${active} active, ${quarantined} quarantined, ${disabled} disabled]`)
+          }
+          return lines.join("\n") || "No providers configured."
+        },
+      }),
     },
 
     event: async ({ event }) => {
