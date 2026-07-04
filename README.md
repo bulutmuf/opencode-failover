@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <video src="https://github.com/bulutmuf/opencode-failover/raw/main/assets/demo.mp4" controls autoplay loop muted width="800"></video>
+  <img src="assets/demo.gif" alt="opencode-failover demo" width="800">
 </p>
 
 ---
