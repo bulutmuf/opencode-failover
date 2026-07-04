@@ -1,6 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
-import { validateProviderConfig, loadProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
+import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
 import { KeyPool } from "./state.ts"
 import { classify, ErrorAction } from "./classify.ts"
 
@@ -41,6 +41,8 @@ function log(input: PluginInput, message: string, extra?: Record<string, unknown
   })
 }
 
+const lastUsed = new Map<string, { providerID: string; key: string }>()
+
 async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks> {
   const pool = new KeyPool()
 
@@ -75,6 +77,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       const key = pool.pick(providerID)
       const headerValue = `${config.scheme} ${key}`
       output.headers = { ...output.headers, [config.header]: headerValue }
+      lastUsed.set(incoming.sessionID, { providerID, key })
       if (DEBUG) {
         const masked = key.length > 4 ? `${key.slice(0, 4)}...${key.slice(-4)}` : "<short-key>"
         log(input, `injected key ${masked} for ${providerID}`, {
@@ -211,44 +214,31 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       const result = classify(error)
       if (result.action === ErrorAction.Ignore) return
 
-      for (const providerID of pool.allProviderIDs()) {
-        const keys = pool.status(providerID)
-        for (const k of keys) {
-          if (k.status === "active" || k.status === "quarantined") {
-            const authHeader = `${validateProviderConfig(providerID, opts).scheme} ${k.key}`
-            if (containsAuthError(error, authHeader)) {
-              if (result.action === ErrorAction.Disable) {
-                pool.disable(providerID, k.key, result.reason)
-                const masked = k.key.length > 7 ? `${k.key.slice(0, 4)}...${k.key.slice(-3)}` : "<key>"
-                const toastMsg = `opencode-failover: ${displayName(providerID)} key ${masked} disabled — ${result.reason}. Remove and replace this key.`
-                log(input, `disabled key for ${providerID}: ${result.reason}`, { providerID, reason: result.reason, sessionID: properties?.sessionID })
-                await input.client.tui.showToast({ body: { message: toastMsg, variant: "error" } })
-              }
-              if (result.action === ErrorAction.Rotate) {
-                pool.quarantine(providerID, k.key, result.retryAfterMs, result.reason)
-                const masked = k.key.length > 7 ? `${k.key.slice(0, 4)}...${k.key.slice(-3)}` : "<key>"
-                const nextKey = pool.pick(providerID)
-                const maskedNext = nextKey.length > 7 ? `${nextKey.slice(0, 4)}...${nextKey.slice(-3)}` : "<key>"
-                const backoffSec = result.retryAfterMs ? Math.ceil(result.retryAfterMs / 1000) : 60
-                const toastMsg = `opencode-failover: [${displayName(providerID)}] Key ${masked} quarantined (${result.reason}). Switching to ${maskedNext} (Backoff: ${backoffSec}s).`
-                log(input, `quarantined key for ${providerID} (${result.retryAfterMs ?? "default"}ms): ${result.reason}`, { providerID, retryAfterMs: result.retryAfterMs, reason: result.reason, sessionID: properties?.sessionID })
-                await input.client.tui.showToast({ body: { message: toastMsg, variant: "warning" } })
-              }
-              break
-            }
-          }
-        }
+      const sessionID = properties?.sessionID as string | undefined
+      const entry = sessionID ? lastUsed.get(sessionID) : undefined
+      if (!entry) return
+
+      const { providerID, key } = entry
+
+      if (result.action === ErrorAction.Disable) {
+        pool.disable(providerID, key, result.reason)
+        const masked = key.length > 7 ? `${key.slice(0, 4)}...${key.slice(-3)}` : "<key>"
+        const toastMsg = `opencode-failover: ${displayName(providerID)} key ${masked} disabled — ${result.reason}. Remove and replace this key.`
+        log(input, `disabled key for ${providerID}: ${result.reason}`, { providerID, reason: result.reason, sessionID })
+        await input.client.tui.showToast({ body: { message: toastMsg, variant: "error" } })
+      }
+      if (result.action === ErrorAction.Rotate) {
+        pool.quarantine(providerID, key, result.retryAfterMs, result.reason)
+        const masked = key.length > 7 ? `${key.slice(0, 4)}...${key.slice(-3)}` : "<key>"
+        const nextKey = pool.pick(providerID)
+        const maskedNext = nextKey.length > 7 ? `${nextKey.slice(0, 4)}...${nextKey.slice(-3)}` : "<key>"
+        const backoffSec = result.retryAfterMs ? Math.ceil(result.retryAfterMs / 1000) : 60
+        const toastMsg = `opencode-failover: [${displayName(providerID)}] Key ${masked} quarantined (${result.reason}). Switching to ${maskedNext} (Backoff: ${backoffSec}s).`
+        log(input, `quarantined key for ${providerID} (${result.retryAfterMs ?? "default"}ms): ${result.reason}`, { providerID, retryAfterMs: result.retryAfterMs, reason: result.reason, sessionID })
+        await input.client.tui.showToast({ body: { message: toastMsg, variant: "warning" } })
       }
     },
   }
-}
-
-function containsAuthError(error: Record<string, unknown>, headerValue: string): boolean {
-  const body = String(error.responseBody ?? error.body ?? "")
-  const message = String(error.message ?? "")
-  const combined = `${body} ${message}`.toLowerCase()
-  const key = headerValue.toLowerCase()
-  return combined.includes(key)
 }
 
 export default failoverPlugin
