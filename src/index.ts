@@ -57,7 +57,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
 
     tool: {
       "keychain.status": tool({
-        description: "Show the current state of all configured API keys: active, quarantined, disabled, weights, and retry timers. No arguments needed.",
+        description: "opencode-failover plugin: Show the current state of all configured API keys — active, quarantined, disabled, weights, and retry timers. No arguments needed.",
         args: {},
         async execute() {
           const lines: string[] = []
@@ -84,7 +84,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       }),
 
       "keychain.setup": tool({
-        description: "Save API keys for a provider so the plugin can rotate between them. When the user asks to add API keys, extract the provider name and keys from their message and call this tool. The user should provide the provider name (e.g. nvidia, openrouter, anthropic) and one or more comma-separated API keys.",
+        description: "opencode-failover plugin: Save API keys for a provider so the plugin can rotate between them. When the user asks to add API keys, extract the provider name and keys from their message and call this tool.",
         args: {
           provider: tool.schema.string().describe("Provider name, e.g. nvidia, openrouter, anthropic, openai"),
           keys: tool.schema.string().describe("One or more comma-separated API keys, e.g. nvapi-xxx,nvapi-yyy"),
@@ -112,7 +112,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       }),
 
       "keychain.remove": tool({
-        description: "Remove all API keys for a provider from the .env file. When the user asks to remove keys, extract the provider name and call this tool.",
+        description: "opencode-failover plugin: Remove all API keys for a provider from the .env file. When the user asks to remove keys, extract the provider name and call this tool.",
         args: {
           provider: tool.schema.string().describe("Provider name to remove keys for, e.g. nvidia, openrouter"),
         },
