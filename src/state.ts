@@ -1,0 +1,106 @@
+import type { ProviderConfig } from "./config.ts"
+
+export type KeyStatus = "active" | "quarantined" | "disabled"
+
+export interface KeyState {
+  key: string
+  weight: number
+  status: KeyStatus
+  quarantinedUntil: number
+  consecutiveErrors: number
+  lastErrorAt: number
+  lastErrorMessage: string
+  retryAfterMs: number | null
+}
+
+export type KeyMetadata = Pick<KeyState, "status" | "quarantinedUntil" | "consecutiveErrors" | "lastErrorAt" | "lastErrorMessage" | "retryAfterMs">
+
+const QUARANTINE_BASE_MS = 60_000
+const QUARANTINE_CAP_MS = 300_000
+
+export class KeyPool {
+  private pools = new Map<string, KeyState[]>()
+  private indexes = new Map<string, number>()
+
+  register(providerID: string, config: ProviderConfig): void {
+    const weight = config.weight ?? {}
+    const now = Date.now()
+    this.pools.set(
+      providerID,
+      config.keys.map((key, i) => ({
+        key,
+        weight: weight[key] ?? 1,
+        status: "active" as KeyStatus,
+        quarantinedUntil: 0,
+        consecutiveErrors: 0,
+        lastErrorAt: 0,
+        lastErrorMessage: "",
+        retryAfterMs: null,
+      })),
+    )
+    this.indexes.set(providerID, 0)
+  }
+
+  private pool(providerID: string): KeyState[] {
+    const pool = this.pools.get(providerID)
+    if (!pool) throw new Error(`Provider "${providerID}" not registered`)
+    return pool
+  }
+
+  pick(providerID: string): string {
+    const pool = this.pool(providerID)
+    const now = Date.now()
+    const released = pool.filter((k) => k.status === "quarantined" && (k.quarantinedUntil === 0 || now >= k.quarantinedUntil))
+    for (const k of released) {
+      k.status = "active"
+      k.consecutiveErrors = 0
+      if (k.quarantinedUntil === 0) k.quarantinedUntil = now
+    }
+    const active = pool.filter((k) => k.status === "active")
+    if (active.length === 0) {
+      const earliest = pool.reduce((best, curr) => curr.quarantinedUntil < best.quarantinedUntil ? curr : best)
+      earliest.status = "active"
+      earliest.consecutiveErrors = 0
+      active.push(earliest)
+    }
+    const slots: string[] = []
+    for (const k of active) {
+      for (let w = 0; w < k.weight; w++) slots.push(k.key)
+    }
+    const idx = (this.indexes.get(providerID)! + 1) % slots.length
+    this.indexes.set(providerID, idx)
+    return slots[idx]!
+  }
+
+  quarantine(providerID: string, key: string, retryAfterMs: number | null, reason: string): void {
+    const entry = this.pool(providerID).find((k) => k.key === key)
+    if (!entry) return
+    
+    entry.status = "quarantined"
+    entry.consecutiveErrors++
+    const base = QUARANTINE_BASE_MS
+    const factor = Math.min(entry.consecutiveErrors - 1, 4)
+    const exp = QUARANTINE_CAP_MS
+    const quarantineMs = Math.min(base * Math.pow(2, factor), exp)
+    entry.quarantinedUntil = Date.now() + quarantineMs
+    entry.lastErrorAt = Date.now()
+    entry.lastErrorMessage = reason
+    entry.retryAfterMs = retryAfterMs
+  }
+
+  disable(providerID: string, key: string, reason: string): void {
+    const entry = this.pool(providerID).find((k) => k.key === key)
+    if (!entry) return
+    entry.status = "disabled"
+    entry.lastErrorAt = Date.now()
+    entry.lastErrorMessage = reason
+  }
+
+  status(providerID: string): KeyState[] {
+    return [...this.pool(providerID)]
+  }
+
+  allProviderIDs(): string[] {
+    return Array.from(this.pools.keys())
+  }
+}
