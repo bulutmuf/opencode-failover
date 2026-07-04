@@ -6,6 +6,30 @@ import { classify, ErrorAction } from "./classify.ts"
 
 const DEBUG = Boolean(Bun.env.OPENCODE_FAILOVER_DEBUG)
 
+const PROVIDER_DISPLAY: Record<string, string> = {
+  nvidia: "NVIDIA NIM",
+  openrouter: "OpenRouter",
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+  groq: "Groq",
+  mistral: "Mistral",
+  deepseek: "DeepSeek",
+  copilot: "GitHub Copilot",
+  together: "Together AI",
+  fireworks: "Fireworks AI",
+  perplexity: "Perplexity",
+  anyscale: "Anyscale",
+  replicate: "Replicate",
+  aws: "AWS Bedrock",
+  azure: "Azure OpenAI",
+  cloudflare: "Cloudflare Workers AI",
+}
+
+function displayName(id: string): string {
+  return PROVIDER_DISPLAY[id.toLowerCase()] ?? id.charAt(0).toUpperCase() + id.slice(1)
+}
+
 function log(input: PluginInput, message: string, extra?: Record<string, unknown>) {
   input.client.app.log({
     body: {
@@ -109,11 +133,11 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           log(input, `saved ${keyList.length} keys for ${provider}`, { provider, count: keyList.length })
           await input.client.tui.showToast({
             body: {
-              message: `Saved ${keyList.length} key(s) for ${provider}. Restart OpenCode to apply.`,
+              message: `Saved ${keyList.length} key(s) for ${displayName(provider)}. Restart OpenCode to apply.`,
               variant: "success",
             },
           })
-          return `opencode-failover: Saved ${keyList.length} key(s) for ${provider} to ${envPath}. Restart OpenCode to apply.`
+          return `opencode-failover: Saved ${keyList.length} key(s) for ${displayName(provider)} to ${envPath}. Restart OpenCode to apply.`
         },
       }),
 
@@ -130,11 +154,11 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           log(input, `removed keys for ${provider}`, { provider })
           await input.client.tui.showToast({
             body: {
-              message: removed ? `Removed ${provider} key(s). Restart OpenCode to apply.` : `No keys found for ${provider}.`,
+              message: removed ? `Removed ${displayName(provider)} key(s). Restart OpenCode to apply.` : `No keys found for ${displayName(provider)}.`,
               variant: removed ? "success" : "info",
             },
           })
-          return removed ? `opencode-failover: Removed ${provider} key(s) from ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${provider} in ${envPath}.`
+          return removed ? `opencode-failover: Removed ${displayName(provider)} key(s) from ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
         },
       }),
     },
