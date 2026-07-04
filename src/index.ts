@@ -63,7 +63,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
 
     tool: {
       "keychain-status": tool({
-        description: "opencode-failover: Show live status of all API keys — active, quarantined, disabled, weights, retry timers. Call with no arguments.",
+        description: "opencode-failover: Show live status of all API keys — active, quarantined, disabled, weights, retry timers. CALL THIS when the user asks about API key status, key health, rotation state, or says 'show keychain'. No arguments needed.",
         args: {},
         async execute() {
           const lines: string[] = []
@@ -90,7 +90,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       }),
 
       "keychain-setup": tool({
-        description: "opencode-failover: Save API keys for a provider. Extract provider name and keys from user message. Requires: provider (string) and keys (comma-separated string).",
+        description: "opencode-failover: Save API keys for a provider. CALL THIS when the user wants to add, save, or set API keys. Extract provider name and comma-separated keys from their message. Requires: provider (string) and keys (comma-separated string).",
         args: {
           provider: tool.schema.string().describe("Provider name, e.g. nvidia, openrouter, anthropic, openai"),
           keys: tool.schema.string().describe("One or more comma-separated API keys, e.g. nvapi-xxx,nvapi-yyy"),
@@ -118,7 +118,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       }),
 
       "keychain-remove": tool({
-        description: "opencode-failover: Remove all API keys for a provider from the .env file. Requires: provider (string).",
+        description: "opencode-failover: Remove all API keys for a provider from the .env file. CALL THIS when the user wants to remove, delete, or clear API keys for a provider. Requires: provider (string).",
         args: {
           provider: tool.schema.string().describe("Provider name to remove keys for, e.g. nvidia, openrouter"),
         },
