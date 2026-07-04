@@ -16,7 +16,12 @@ const PROVIDERS_ENV_KEY = "OPENCODE_FAILOVER_PROVIDERS"
 export function parseEnvProviders(): Map<string, ProviderConfig> {
   const raw = Bun.env[PROVIDERS_ENV_KEY]
   if (!raw) return new Map()
-  const parsed = JSON.parse(raw) as Options
+  let parsed: Record<string, ProviderConfig>
+  try {
+    parsed = JSON.parse(raw) as Record<string, ProviderConfig>
+  } catch {
+    return new Map()
+  }
   const result = new Map<string, ProviderConfig>()
   for (const [id, cfg] of Object.entries(parsed)) {
     const validated = ProviderConfigSchema.parse(cfg)
