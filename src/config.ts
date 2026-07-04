@@ -75,10 +75,25 @@ export function loadProviderConfig(
   return fromOptsOnly ?? null
 }
 
+export function discoverEnvProviders(): Map<string, ProviderConfig> {
+  const result = new Map<string, ProviderConfig>()
+  for (const [key, value] of Object.entries(Bun.env)) {
+    if (!key.endsWith("_API_KEYS")) continue
+    if (key === PROVIDERS_ENV_KEY) continue
+    const providerID = key.slice(0, -"_API_KEYS".length).toLowerCase()
+    if (!value) continue
+    const keys = value.split(",").map((k) => k.trim()).filter(Boolean)
+    if (keys.length === 0) continue
+    result.set(providerID, { keys, header: "Authorization", scheme: "Bearer" })
+  }
+  return result
+}
+
 export function providerIDs(opts?: unknown): string[] {
   const fromEnv = Array.from(parseEnvProviders().keys())
   const fromOpts = Array.from(parseOptionsProviders(opts).keys())
-  return [...new Set([...fromEnv, ...fromOpts])]
+  const fromDiscovered = Array.from(discoverEnvProviders().keys())
+  return [...new Set([...fromEnv, ...fromOpts, ...fromDiscovered])]
 }
 
 export function validateProviderConfig(
