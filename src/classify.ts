@@ -22,11 +22,11 @@ interface APIError {
 
 export function classify(raw: unknown): ClassifierResult {
   const error = (raw as Record<string, unknown>).data ?? raw
-  const status = (error as APIError).statusCode ?? (error as Record<string, unknown>).status ?? 0
+  const status = Number((error as APIError).statusCode ?? (error as Record<string, unknown>).status ?? 0)
   const headers = (error as APIError).responseHeaders ?? (error as Record<string, unknown>).headers ?? {}
   const body = String((error as APIError).responseBody ?? (error as Record<string, unknown>).body ?? "")
   const message = String((error as APIError).message ?? (error as Record<string, unknown>).message ?? "")
-  const isRetryable = (error as APIError).isRetryable ?? (error as Record<string, unknown>).isRetryable ?? false
+  const isRetryable = Boolean((error as APIError).isRetryable ?? (error as Record<string, unknown>).isRetryable ?? false)
 
   const retryAfterMs = parseRetryAfter(headers as Record<string, string>)
 
