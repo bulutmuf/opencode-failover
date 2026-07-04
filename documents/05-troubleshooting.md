@@ -43,8 +43,9 @@ use a different key. If 429 persists, the key may need a longer quarantine
    the provider ID (e.g., `"nvidia"`, `"openrouter"`, `"anthropic"`).
 
 3. **No keys configured**: The plugin skips providers with no keys —
-   opencode's native key handling takes over. Fix: use `/keychain.setup`
-   to add keys, or create a `.env` file with `{PROVIDER}_API_KEYS=key1,key2`.
+   opencode's native key handling takes over. Fix: ask the LLM to add
+   keys (e.g., "Add these API keys for nvidia: key1, key2"), or create
+   a `.env` file with `{PROVIDER}_API_KEYS=key1,key2`.
 
 4. **Plugin not in opencode.json**: The plugin is installed but not listed
    in the `"plugin"` array. Fix: add `"opencode-failover"` to the plugin
@@ -107,13 +108,9 @@ Logs are written to opencode's internal logging system via
 
 ## Key pool state inspection
 
-Use the `keychain.status` tool from the TUI:
+Ask the LLM in the TUI:
 
-```
-/keychain.status
-```
-
-Or ask the LLM: "Show me the keychain status"
+> Show me the keychain status
 
 Output format:
 ```

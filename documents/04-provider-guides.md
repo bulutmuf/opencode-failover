@@ -8,10 +8,9 @@ NVIDIA NIM uses OpenAI-compatible API with `Authorization: Bearer <key>`.
 
 **Option 1: .env file (recommended)**
 
-```bash
-# Run in opencode TUI, or create manually:
-/keychain.setup provider=nvidia keys=nvapi-xxx,nvapi-yyy,nvapi-zzz
-```
+Ask the LLM in the TUI:
+
+> Add these NVIDIA API keys for failover rotation: nvapi-xxx, nvapi-yyy, nvapi-zzz
 
 Or create `.env` in your project root:
 

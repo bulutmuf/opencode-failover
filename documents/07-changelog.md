@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`keychain.setup` tool**: Interactive key setup via `/keychain.setup provider=<id> keys=<comma-separated>`. Writes to `.env` file automatically.
-- **`keychain.remove` tool**: Remove keys for a provider via `/keychain.remove provider=<id>`.
+- **`keychain.setup` tool**: Interactive key setup via natural language (e.g., "Add these API keys for nvidia: key1, key2"). Writes to `.env` file automatically.
+- **`keychain.remove` tool**: Remove keys for a provider via natural language (e.g., "Remove all nvidia API keys").
 - **`.env` file support**: Plugin reads `{PROVIDER}_API_KEYS=...` from `.env` at startup. Custom path via `OPENCODE_FAILOVER_ENV_FILE`.
 - **Startup key detection**: Toast notification warns if any configured provider has no keys.
 - **Key rotation**: Slot-based weighted round-robin across multiple API keys
