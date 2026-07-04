@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`keychain.setup` tool**: Interactive key setup via natural language (e.g., "Add these API keys for nvidia: key1, key2"). Writes to `.env` file automatically.
-- **`keychain.remove` tool**: Remove keys for a provider via natural language (e.g., "Remove all nvidia API keys").
+- **`keychain-setup` tool**: Interactive key setup via natural language (e.g., "Add these API keys for nvidia: key1, key2"). Writes to `.env` file automatically.
+- **`keychain-remove` tool**: Remove keys for a provider via natural language (e.g., "Remove all nvidia API keys").
 - **`.env` file support**: Plugin reads `{PROVIDER}_API_KEYS=...` from `.env` at startup. Custom path via `OPENCODE_FAILOVER_ENV_FILE`.
 - **Startup key detection**: Toast notification warns if any configured provider has no keys.
 - **Key rotation**: Slot-based weighted round-robin across multiple API keys
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `too_many_requests`, OpenAI `rate_limit`, generic "exhausted"/"unavailable").
 
 - **Key disable**: Permanently disables keys on auth/billing failures (401/402/403).
-  Disabled keys are reported via `keychain.status` but never reused.
+  Disabled keys are reported via `keychain-status` but never reused.
 
 - **`chat.headers` hook**: Injects `Authorization: Bearer <key>` (configurable
   header/scheme) before each LLM request.
@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`session.error` event subscriber**: Classifies errors and mutates key pool
   state in real time.
 
-- **`keychain.status` tool**: LLM-callable tool showing live key state:
+- **`keychain-status` tool**: LLM-callable tool showing live key state:
   active/quarantined/disabled counts, masked key identifiers, quarantine
   timers, last error messages.
 
@@ -61,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the NEXT request, not the current retry cycle.
 
 - Keys are cached at startup. Hot-reload requires opencode restart.
-  `keychain.reload` tool is planned for v0.2.0.
+  `keychain-reload` tool is planned for v0.2.0.
 
 - No `provider` hook in v1 — the plugin rotates keys on existing providers
   via `chat.headers`, it does not register virtual providers. Provider hook

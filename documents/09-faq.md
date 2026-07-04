@@ -153,7 +153,7 @@ Not in v1. Keys are loaded at plugin startup. To change keys:
 1. Update env vars or `opencode.json`.
 2. Restart OpenCode.
 
-A `keychain.reload` tool is planned for v0.2.0 that re-reads config
+A `keychain-reload` tool is planned for v0.2.0 that re-reads config
 without restart.
 
 ### Does the plugin persist state across restarts?
@@ -217,7 +217,7 @@ your `opencode.json` provider configuration.
 
 Keys are masked in all plugin output:
 - Debug logs: `nvapi...abc` (first 4 + last 4)
-- `keychain.status`: `nvapi...abc` (first 4 + last 3)
+- `keychain-status`: `nvapi...abc` (first 4 + last 3)
 - Error messages: keys are never included
 
 The full key is present in the `Authorization` header sent to the

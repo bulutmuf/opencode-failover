@@ -61,7 +61,7 @@ type(scope): summary
 | `state` | Key pool logic (`src/state.ts`) |
 | `classify` | Error classification (`src/classify.ts`) |
 | `hooks` | Plugin hook wiring (`src/index.ts` chat.headers, event) |
-| `tool` | `keychain.status` tool |
+| `tool` | `keychain-status` tool |
 | `ci` | GitHub Actions workflows |
 | (none) | Cross-cutting changes |
 

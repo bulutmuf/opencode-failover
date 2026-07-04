@@ -11,7 +11,7 @@ disk, logs, or error messages by the plugin itself.
 The plugin masks keys in all output:
 
 - **Debug logs**: `nvapi...abc` (first 4 + last 4 characters)
-- **keychain.status tool**: `nvapi...abc` (first 4 + last 3 characters)
+- **keychain-status tool**: `nvapi...abc` (first 4 + last 3 characters)
 - **Error messages**: Keys are never included in error output
 
 ### What is NOT masked
@@ -119,7 +119,7 @@ If using this plugin in CI:
 1. **Rotate keys regularly** — generate new keys and update config
    periodically, even without errors.
 2. **Use separate keys per environment** — dev, staging, production.
-3. **Monitor key usage** — use `keychain.status` to check for disabled
+3. **Monitor key usage** — use `keychain-status` to check for disabled
    keys that indicate auth failures.
 4. **Revoke unused keys** — if a key is disabled by the plugin, revoke
    it at the provider dashboard.
