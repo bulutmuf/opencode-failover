@@ -4,6 +4,14 @@
   "description": "OpenCode plugin for automatic API-key failover and rotation across multiple provider keys",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bulutmuf/opencode-failover.git"
+  },
+  "homepage": "https://github.com/bulutmuf/opencode-failover#readme",
+  "bugs": {
+    "url": "https://github.com/bulutmuf/opencode-failover/issues"
+  },
   "keywords": [
     "opencode",
     "opencode-plugin",
