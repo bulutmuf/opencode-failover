@@ -1,6 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
-import { validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
+import { validateProviderConfig, loadProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
 import { KeyPool } from "./state.ts"
 import { classify, ErrorAction } from "./classify.ts"
 
@@ -27,8 +27,6 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
 
   if (DEBUG) log(input, `initialized ${pool.allProviderIDs().length} provider pools`)
 
-  let startupToastShown = false
-
   return {
     dispose: async () => {},
 
@@ -38,24 +36,12 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       for (const [key, value] of envVars) {
         if (!Bun.env[key]) Bun.env[key] = value
       }
-      const missing = providerIDs(opts).filter((id) => {
-        try { validateProviderConfig(id, opts); return false } catch { return true }
-      })
-      if (missing.length > 0 && !startupToastShown) {
-        startupToastShown = true
-        await input.client.tui.showToast({
-          body: {
-            message: `Missing keys for: ${missing.join(", ")}. Run /keychain.setup or add to .env`,
-            variant: "warning",
-            duration: 8000,
-          },
-        })
-      }
     },
 
     "chat.headers": async (incoming, output) => {
       const providerID = incoming.model.providerID
-      const config = validateProviderConfig(providerID, opts)
+      const config = loadProviderConfig(providerID, opts)
+      if (!config) return
       const key = pool.pick(providerID)
       const headerValue = `${config.scheme} ${key}`
       output.headers = { ...output.headers, [config.header]: headerValue }
