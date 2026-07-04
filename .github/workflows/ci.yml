@@ -32,7 +32,5 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
-      - run: bun publish --access public
-        env:
-          NPM_CONFIG_PROVENANCE: true
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
+      - run: npm publish --access public
