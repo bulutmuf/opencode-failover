@@ -52,7 +52,7 @@ Open the opencode TUI and send this to the LLM:
 Add these NVIDIA API keys for failover rotation: nvapi-key1, nvapi-key2, nvapi-key3
 ```
 
-The plugin saves them to `.env`. Restart opencode and it starts rotating automatically.
+The plugin saves them to `.env`. Restart OpenCode and it starts rotating automatically.
 
 To check key status later, ask:
 

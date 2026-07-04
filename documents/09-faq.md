@@ -21,7 +21,7 @@ NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"
 OPENROUTER_API_KEYS="sk-or-v1-xxx,sk-or-v1-yyy"
 ```
 
-Restart opencode. The plugin reads `.env` at startup.
+Restart OpenCode. The plugin reads `.env` at startup.
 
 ### 3. Shell environment variables
 
@@ -151,7 +151,7 @@ every LLM request regardless of runtime.
 
 Not in v1. Keys are loaded at plugin startup. To change keys:
 1. Update env vars or `opencode.json`.
-2. Restart opencode.
+2. Restart OpenCode.
 
 A `keychain.reload` tool is planned for v0.2.0 that re-reads config
 without restart.

@@ -24,7 +24,7 @@ use a different key. If 429 persists, the key may need a longer quarantine
 **Fix**:
 1. Check each key at the provider's dashboard.
 2. Generate new keys.
-3. Update config (env or `opencode.json`) and restart opencode.
+3. Update config (env or `opencode.json`) and restart OpenCode.
 4. Disabled keys cannot be re-enabled without restarting — they are
    permanently removed from rotation.
 
