@@ -227,10 +227,10 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
               if (result.action === ErrorAction.Rotate) {
                 pool.quarantine(providerID, k.key, result.retryAfterMs, result.reason)
                 const masked = k.key.length > 7 ? `${k.key.slice(0, 4)}...${k.key.slice(-3)}` : "<key>"
-                const activeKeys = pool.status(providerID).filter((x) => x.status === "active" && x.key !== k.key).length
-                const remaining = activeKeys > 0 ? ` Switched to next key.` : ` No other keys available — retrying after backoff.`
+                const nextKey = pool.pick(providerID)
+                const maskedNext = nextKey.length > 7 ? `${nextKey.slice(0, 4)}...${nextKey.slice(-3)}` : "<key>"
                 const backoffSec = result.retryAfterMs ? Math.ceil(result.retryAfterMs / 1000) : 60
-                const toastMsg = `opencode-failover: ${displayName(providerID)} key ${masked} hit ${result.reason}. Quarantined for ${backoffSec}s.${remaining}`
+                const toastMsg = `opencode-failover: [${displayName(providerID)}] Key ${masked} quarantined (${result.reason}). Switching to ${maskedNext} (Backoff: ${backoffSec}s).`
                 log(input, `quarantined key for ${providerID} (${result.retryAfterMs ?? "default"}ms): ${result.reason}`, { providerID, retryAfterMs: result.retryAfterMs, reason: result.reason, sessionID: properties?.sessionID })
                 await input.client.tui.showToast({ body: { message: toastMsg, variant: "warning" } })
               }
