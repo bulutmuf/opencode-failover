@@ -149,12 +149,9 @@ every LLM request regardless of runtime.
 
 ### Can I add/remove keys without restarting?
 
-Not in v1. Keys are loaded at plugin startup. To change keys:
-1. Update env vars or `opencode.json`.
-2. Restart OpenCode.
+Yes. Use the `keychain-setup` and `keychain-remove` tools via natural language. Changes take effect immediately in the current session — no restart needed.
 
-A `keychain-reload` tool is planned for v0.2.0 that re-reads config
-without restart.
+If you manually edit `.env` or env vars, restart OpenCode to pick up changes.
 
 ### Does the plugin persist state across restarts?
 

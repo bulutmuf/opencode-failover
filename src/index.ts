@@ -133,11 +133,11 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           log(input, `saved ${newKeys.length} key(s) for ${provider} (total: ${merged.length})`, { provider, added: newKeys.length, total: merged.length })
           await input.client.tui.showToast({
             body: {
-              message: `Saved ${newKeys.length} key(s) for ${displayName(provider)}. Total: ${merged.length} key(s). Restart OpenCode to apply.`,
+              message: `Saved ${newKeys.length} key(s) for ${displayName(provider)}. Total: ${merged.length} key(s).`,
               variant: "success",
             },
           })
-          return `opencode-failover: Saved ${newKeys.length} key(s) for ${displayName(provider)}. Total: ${merged.length} key(s) in ${envPath}. Restart OpenCode to apply.`
+          return `opencode-failover: Saved ${newKeys.length} key(s) for ${displayName(provider)}. Total: ${merged.length} key(s) in ${envPath}.`
         },
       }),
 
@@ -178,17 +178,17 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
             const removedCount = existingKeys.length - remaining.length
             log(input, `removed ${removedCount} key(s) from ${provider} (total remaining: ${remaining.length})`, { provider, removed: removedCount, remaining: remaining.length })
             await input.client.tui.showToast({
-              body: { message: `Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining. Restart OpenCode to apply.`, variant: "success" },
+              body: { message: `Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining.`, variant: "success" },
             })
-            return `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining in ${envPath}. Restart OpenCode to apply.`
+            return `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining in ${envPath}.`
           }
           const removed = await removeEnvKey(envPath, envKey)
           delete Bun.env[envKey]
           log(input, `removed all ${existingKeys.length} key(s) for ${provider}`, { provider, count: existingKeys.length })
           await input.client.tui.showToast({
-            body: { message: removed ? `Removed all ${existingKeys.length} key(s) from ${displayName(provider)}. Restart OpenCode to apply.` : `No keys found for ${displayName(provider)}.`, variant: removed ? "success" : "info" },
+            body: { message: removed ? `Removed all ${existingKeys.length} key(s) from ${displayName(provider)}.` : `No keys found for ${displayName(provider)}.`, variant: removed ? "success" : "info" },
           })
-          return removed ? `opencode-failover: Removed all ${existingKeys.length} key(s) from ${displayName(provider)} in ${envPath}. Restart OpenCode to apply.` : `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
+          return removed ? `opencode-failover: Removed all ${existingKeys.length} key(s) from ${displayName(provider)} in ${envPath}.` : `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
         },
       }),
     },

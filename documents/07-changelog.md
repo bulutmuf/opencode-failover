@@ -60,8 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   effect (opencode's own retry fires in-place). The plugin changes the key
   for the NEXT request, not the current retry cycle.
 
-- Keys are cached at startup. Hot-reload requires opencode restart.
-  `keychain-reload` tool is planned for v0.2.0.
+- Keys added/removed via `keychain-setup`/`keychain-remove` take effect
+  immediately in the current session. No restart needed.
 
 - No `provider` hook in v1 — the plugin rotates keys on existing providers
   via `chat.headers`, it does not register virtual providers. Provider hook
