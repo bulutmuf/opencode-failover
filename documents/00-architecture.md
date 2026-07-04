@@ -6,6 +6,103 @@ Rotate API keys across multiple keys for the same opencode provider so that
 rate-limited or auth-failing keys are skipped and the next healthy key is
 used on the following request.
 
+## Request flow
+
+```
+User sends message
+        │
+        ▼
+┌───────────────────┐
+│  opencode runtime │
+│  (AI SDK / native)│
+└────────┬──────────┘
+         │
+         │  1. chat.headers hook fires
+         ▼
+┌───────────────────┐     ┌──────────────────┐
+│ opencode-failover │────▶│ KeyPool.pick()   │
+│   plugin          │     │  → active key    │
+│                   │     │  → slot-based    │
+│                   │     │    round-robin   │
+└────────┬──────────┘     └──────────────────┘
+         │
+         │  2. Authorization header injected
+         ▼
+┌───────────────────┐
+│  LLM provider API │  (NVIDIA, OpenRouter, Anthropic, etc.)
+└────────┬──────────┘
+         │
+    ┌────┴────┐
+    │ success │ error
+    └────┬────┘
+         │         │
+         ▼         ▼
+      response   ┌──────────────────┐
+                 │ session.error    │
+                 │ event fires      │
+                 └────────┬─────────┘
+                          │
+                          │  3. classify(error)
+                          ▼
+                 ┌──────────────────┐
+                 │ Rotate? → quarantine key
+                 │ Disable? → remove key
+                 │ Ignore? → no-op
+                 └──────────────────┘
+                          │
+                          ▼
+                 Next request → different key
+```
+
+## Error flow (detailed)
+
+```
+session.error event
+        │
+        ▼
+┌───────────────────┐
+│ classify(raw)     │
+│                   │
+│ 429? ──────────▶ Rotate  ──▶ pool.quarantine(key, retryAfter?)
+│ 401/402/403? ──▶ Disable ──▶ pool.disable(key)
+│ 5xx? ──────────▶ Rotate  ──▶ pool.quarantine(key, null)
+│ rate pattern? ──▶ Rotate  ──▶ pool.quarantine(key, retryAfter?)
+│ other? ────────▶ Ignore  ──▶ (no-op)
+└───────────────────┘
+        │
+        ▼ (Rotate path)
+┌───────────────────┐
+│ quarantine()      │
+│                   │
+│ consecutiveErrors++│
+│ duration = 60s × 2^(n-1) │
+│ capped at 300s    │
+│ retry-after? use it│
+└───────────────────┘
+        │
+        ▼
+Next chat.headers call → pool.pick() skips quarantined keys
+```
+
+## Module dependency graph
+
+```
+index.ts  ──imports──▶  config.ts   (validateProviderConfig, providerIDs)
+    │                       ▲
+    ├──imports──▶  state.ts  │  (KeyPool)
+    │                       │
+    └──imports──▶  classify.ts
+                   (classify, ErrorAction)
+
+Pure modules (no @opencode-ai/plugin dependency):
+  config.ts    env + options → ProviderConfig
+  state.ts     KeyPool: round-robin + weight + quarantine
+  classify.ts  raw error → { action, retryAfterMs, reason }
+
+Only plugin-dependent module:
+  index.ts     plugin factory wiring hooks
+```
+
 ## Hook surface (used in v1)
 
 opencode's V1 plugin SDK (`@opencode-ai/plugin`) exposes three hooks that
@@ -22,24 +119,29 @@ together implement failover without owning the provider:
 - **`tool`** — a single tool `keychain.status` is registered so the LLM and
   the TUI slash command surface can inspect live key state.
 
-A `provider` hook (registering a virtual provider id and listing models) is
-deliberately out of scope for v1. It would couple the plugin to AI SDK
-delegation and require model catalogue maintenance. v2 may add it.
+## Why not the `provider` hook
 
-## Why chat.headers and not a custom fetch interceptor
+The `provider` hook registers a virtual provider ID and optionally lists
+models. It couples the plugin to AI SDK delegation and requires model
+catalogue maintenance. `chat.headers` works with any existing provider
+configuration — the plugin only rotates keys, it does not own the request
+pipeline. A `provider` hook may be added in v2 for richer control (virtual
+provider registration, model filtering).
 
-opencode's AI SDK + native runtime path already owns fetch. The only seam a
-plugin has into the outbound request is `chat.headers`. Two in-tree plugins
-already rely on this pattern (`packages/opencode/src/plugin/github-copilot/
-copilot.ts:360` and `packages/opencode/src/plugin/openai/codex.ts:540`), so
-it is the established path.
+## Why not `tool.execute.after`
 
-## Why session.error and not tool.execute.after
+`tool.execute.after` only covers tool calls (bash, file edits, etc.), not
+the message-step LLM call that most providers rate-limit. `session.error`
+is the only event that carries the full `Assistant.fields.error` payload,
+which includes `statusCode` and `responseHeaders` — exactly what is needed
+to detect rate limits and read `retry-after`.
 
-`tool.execute.after` only covers tool calls, not the message-step LLM call.
-`session.error` is the only event that carries the full `Assistant.fields.
-error` payload, which includes `statusCode` and `responseHeaders` — exactly
-what is needed to detect rate limits and read `retry-after`.
+## Why `session.error` and not `chat.message`
+
+`chat.message` fires when a user sends a message, before the LLM call.
+It cannot detect errors that happen during or after the request.
+`session.error` fires after the LLM call fails, carrying the full error
+payload. It is the correct detection point.
 
 ## Important constraint: opencode's own retry
 
