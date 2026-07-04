@@ -1,6 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { tool } from "@opencode-ai/plugin"
-import { validateProviderConfig, providerIDs } from "./config.ts"
+import { validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
 import { KeyPool } from "./state.ts"
 import { classify, ErrorAction } from "./classify.ts"
 
@@ -27,8 +27,31 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
 
   if (DEBUG) log(input, `initialized ${pool.allProviderIDs().length} provider pools`)
 
+  let startupToastShown = false
+
   return {
     dispose: async () => {},
+
+    config: async (cfg) => {
+      const envPath = envFilePath(input.directory)
+      const envVars = readEnvFile(envPath)
+      for (const [key, value] of envVars) {
+        if (!Bun.env[key]) Bun.env[key] = value
+      }
+      const missing = providerIDs(opts).filter((id) => {
+        try { validateProviderConfig(id, opts); return false } catch { return true }
+      })
+      if (missing.length > 0 && !startupToastShown) {
+        startupToastShown = true
+        await input.client.tui.showToast({
+          body: {
+            message: `Missing keys for: ${missing.join(", ")}. Run /keychain.setup or add to .env`,
+            variant: "warning",
+            duration: 8000,
+          },
+        })
+      }
+    },
 
     "chat.headers": async (incoming, output) => {
       const providerID = incoming.model.providerID
@@ -71,6 +94,55 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
             lines.push(`  [${active} active, ${quarantined} quarantined, ${disabled} disabled]`)
           }
           return lines.join("\n") || "No providers configured."
+        },
+      }),
+
+      "keychain.setup": tool({
+        description: "Save API keys for a provider to the .env file. Usage: provider name (e.g. nvidia, openrouter) and comma-separated keys",
+        args: {
+          provider: tool.schema.string().describe("Provider ID (e.g. nvidia, openrouter, anthropic)"),
+          keys: tool.schema.string().describe("Comma-separated API keys"),
+        },
+        async execute({ provider, keys }) {
+          const envPath = envFilePath(input.directory)
+          const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
+          const keyList = keys.split(",").map((k) => k.trim()).filter(Boolean)
+          if (keyList.length === 0) return "No valid keys provided."
+          await writeEnvKey(envPath, envKey, keyList.join(","))
+          Bun.env[envKey] = keyList.join(",")
+          const poolIds = pool.allProviderIDs()
+          if (!poolIds.includes(provider)) {
+            pool.register(provider, { keys: keyList, header: "Authorization", scheme: "Bearer" })
+          }
+          log(input, `saved ${keyList.length} keys for ${provider}`, { provider, count: keyList.length })
+          await input.client.tui.showToast({
+            body: {
+              message: `Saved ${keyList.length} key(s) for ${provider}. Restart opencode to apply.`,
+              variant: "success",
+            },
+          })
+          return `Saved ${keyList.length} key(s) for ${provider} to ${envPath}. Restart opencode to apply.`
+        },
+      }),
+
+      "keychain.remove": tool({
+        description: "Remove all API keys for a provider from the .env file",
+        args: {
+          provider: tool.schema.string().describe("Provider ID to remove keys for"),
+        },
+        async execute({ provider }) {
+          const envPath = envFilePath(input.directory)
+          const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
+          const removed = await removeEnvKey(envPath, envKey)
+          delete Bun.env[envKey]
+          log(input, `removed keys for ${provider}`, { provider })
+          await input.client.tui.showToast({
+            body: {
+              message: removed ? `Removed ${provider} keys. Restart opencode to apply.` : `No keys found for ${provider}.`,
+              variant: removed ? "success" : "info",
+            },
+          })
+          return removed ? `Removed ${provider} keys from ${envPath}. Restart opencode to apply.` : `No keys found for ${provider} in ${envPath}.`
         },
       }),
     },
