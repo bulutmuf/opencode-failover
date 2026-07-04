@@ -262,6 +262,12 @@ documents/
   01-error-patterns.md
   02-quarantine-strategy.md
   03-decisions.md
+  04-provider-guides.md
+  05-troubleshooting.md
+  06-security.md
+  07-changelog.md
+  08-contributing.md
+  09-faq.md
 ```
 
 ## Architecture
@@ -274,6 +280,12 @@ See [`documents/`](documents/) for detailed Architecture Decision Records:
 | [Error Classification](documents/01-error-patterns.md) | Decision table, pattern matching, retry-after parsing |
 | [Quarantine Strategy](documents/02-quarantine-strategy.md) | Exponential backoff, cap, recovery semantics |
 | [Design Decisions](documents/03-decisions.md) | Naming, scope, config precedence, distribution |
+| [Provider Guides](documents/04-provider-guides.md) | Per-provider setup (NVIDIA, OpenRouter, Anthropic, OpenAI, custom) |
+| [Troubleshooting](documents/05-troubleshooting.md) | Common issues, debug mode, key status inspection |
+| [Security](documents/06-security.md) | Key masking, env safety, production risks |
+| [Changelog](documents/07-changelog.md) | v0.1.0 release notes |
+| [Contributing](documents/08-contributing.md) | Dev setup, commit format, test rules, PR flow |
+| [FAQ](documents/09-faq.md) | Provider compatibility, edge cases, debugging |
 
 ## Contributing
 
