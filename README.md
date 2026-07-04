@@ -1,13 +1,8 @@
-<p align="center">
-  <h1 align="center">opencode-failover</h1>
-</p>
+# opencode-failover
 
-<p align="center">
-  API-key failover router plugin for OpenCode.<br/>
-  Rotate across multiple provider keys. Automatically quarantine on rate-limit, disable on auth failure.
-</p>
+> OpenCode plugin for automatic API-key failover and rotation across multiple provider keys.
 
-<p align="center">
+<p>
   <a href="https://www.npmjs.com/package/opencode-failover"><img src="https://img.shields.io/npm/v/opencode-failover?style=flat-square&color=blue" alt="npm version"></a>
   <a href="https://github.com/bulutmuf/opencode-failover/blob/main/LICENSE"><img src="https://img.shields.io/github/license/bulutmuf/opencode-failover?style=flat-square" alt="License"></a>
   <a href="https://github.com/bulutmuf/opencode-failover/actions"><img src="https://img.shields.io/github/actions/workflow/status/bulutmuf/opencode-failover/ci.yml?branch=main&style=flat-square&label=CI" alt="CI"></a>
@@ -18,22 +13,12 @@
 
 ---
 
-<details>
-<summary><strong>Table of Contents</strong></summary>
+**opencode-failover** is a [OpenCode](https://opencode.ai) plugin that automatically rotates API keys across multiple provider credentials. When a key hits a rate limit, the plugin quarantines it and switches to the next available key -- zero downtime, zero manual intervention.
 
-- [Quick Start](#quick-start)
-- [Why This Works](#why-this-works)
-- [Features](#features)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [How It Works](#how-it-works)
-- [Commands](#commands)
-- [Supported Providers](#supported-providers)
-- [Development](#development)
-- [Architecture](#architecture)
-- [License](#license)
-
-</details>
+- Multiple keys per provider with weighted round-robin distribution
+- Automatic quarantine on [rate-limit (429)](#error-classification) with [exponential backoff](#quarantine-schedule)
+- Permanent disable on [auth failure (401/403)](#error-classification)
+- Works with [NVIDIA NIM](https://build.nvidia.com), [OpenRouter](https://openrouter.ai), [Anthropic](https://console.anthropic.com), [OpenAI](https://platform.openai.com), and any OpenCode-compatible provider
 
 ## Quick Start
 
@@ -69,10 +54,10 @@ One provider, multiple keys, zero downtime.
 - `retry-after` header respect (milliseconds, seconds, HTTP-date formats)
 - Permanent disable on auth errors (401/403) and billing errors (402)
 - Temporary quarantine on server errors (5xx)
-- Rate-limit pattern detection (Anthropic, OpenAI, and generic patterns)
-- `/keychain.status` command for real-time key monitoring
+- Rate-limit pattern detection ([Anthropic](https://docs.anthropic.com), [OpenAI](https://platform.openai.com/docs), and generic patterns)
+- [`/keychain.status`](#commands) command for real-time key monitoring
 - Debug logging via `OPENCODE_FAILOVER_DEBUG=1`
-- Works with any OpenCode-compatible provider
+- Works with any [OpenCode](https://opencode.ai)-compatible provider
 
 ## Installation
 
@@ -82,7 +67,7 @@ One provider, multiple keys, zero downtime.
 opencode plugin opencode-failover
 ```
 
-This installs the package and updates your `opencode.json` automatically.
+This installs the package and updates your [`opencode.json`](https://opencode.ai/docs/config) automatically.
 
 ### Option 2: npm
 
@@ -106,7 +91,7 @@ cd opencode-failover
 bun install
 ```
 
-Then symlink or copy `src/index.ts` to your OpenCode plugins directory:
+Then copy the plugin to your OpenCode [plugins directory](https://opencode.ai/docs/plugins):
 
 ```bash
 cp src/index.ts ~/.config/opencode/plugins/failover.ts
@@ -170,8 +155,8 @@ export OPENCODE_FAILOVER_PROVIDERS='{
 ### Precedence
 
 1. `OPENCODE_FAILOVER_PROVIDERS` env (full JSON) overrides everything
-2. `<PROVIDER>_API_KEYS` env + opencode.json options (merged)
-3. opencode.json options only
+2. `<PROVIDER>_API_KEYS` env + `opencode.json` options (merged)
+3. `opencode.json` options only
 
 ## How It Works
 
@@ -193,10 +178,10 @@ Request    -->  Plugin picks next key (weighted round-robin)
 
 | Error | Action | Behavior |
 |-------|--------|----------|
-| 429 | Quarantine | Exponential backoff: 60s, 120s, 240s, 300s cap |
-| 401 / 403 | Disable | Permanent, requires manual re-enable |
-| 402 | Disable | Billing error, permanent |
-| 5xx | Quarantine | Temporary, same backoff as 429 |
+| [429](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429) | Quarantine | Exponential backoff: 60s, 120s, 240s, 300s cap |
+| [401](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401) / [403](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403) | Disable | Permanent, requires manual re-enable |
+| [402](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402) | Disable | Billing error, permanent |
+| [5xx](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses) | Quarantine | Temporary, same backoff as 429 |
 | Rate-limit pattern | Quarantine | Detected in body/message text |
 | Other | Ignore | No action taken |
 
@@ -233,13 +218,13 @@ Works with any provider that uses API key authentication:
 
 | Provider | Env var | Default scheme |
 |----------|---------|----------------|
-| NVIDIA NIM | `NVIDIA_API_KEYS` | Bearer |
-| OpenRouter | `OPENROUTER_API_KEYS` | Bearer |
-| Anthropic | `ANTHROPIC_API_KEYS` | Bearer |
-| OpenAI | `OPENAI_API_KEYS` | Bearer |
+| [NVIDIA NIM](https://build.nvidia.com) | `NVIDIA_API_KEYS` | Bearer |
+| [OpenRouter](https://openrouter.ai) | `OPENROUTER_API_KEYS` | Bearer |
+| [Anthropic](https://console.anthropic.com) | `ANTHROPIC_API_KEYS` | Bearer |
+| [OpenAI](https://platform.openai.com) | `OPENAI_API_KEYS` | Bearer |
 | Any custom | `<PROVIDER>_API_KEYS` | Bearer |
 
-The provider ID must match the `providerID` used in your OpenCode model configuration.
+The provider ID must match the `providerID` used in your [OpenCode model configuration](https://opencode.ai/docs/config).
 
 ## Development
 
@@ -262,12 +247,12 @@ Logs key injection, quarantine decisions, and provider pool initialization.
 
 ```
 src/
-  index.ts        Plugin factory: hooks wiring + tool
-  config.ts       Env + options parser
-  state.ts        KeyPool: rotation, quarantine, backoff
-  classify.ts     Error classifier: status/body -> action
-  state.test.ts   7 tests for rotation and quarantine
-  classify.test.ts 14 tests for error classification
+  index.ts          Plugin factory: hooks wiring + tool
+  config.ts         Env + options parser
+  state.ts          KeyPool: rotation, quarantine, backoff
+  classify.ts       Error classifier: status/body -> action
+  state.test.ts     7 tests for rotation and quarantine
+  classify.test.ts  14 tests for error classification
 documents/
   00-architecture.md
   01-error-patterns.md
@@ -277,13 +262,33 @@ documents/
 
 ## Architecture
 
-See [documents/](documents/) for detailed Architecture Decision Records:
+See [`documents/`](documents/) for detailed Architecture Decision Records:
 
-- [Architecture Overview](documents/00-architecture.md) -- hook surface, module layout, opencode integration
-- [Error Classification](documents/01-error-patterns.md) -- decision table, pattern matching, retry-after parsing
-- [Quarantine Strategy](documents/02-quarantine-strategy.md) -- exponential backoff, cap, recovery semantics
-- [Design Decisions](documents/03-decisions.md) -- naming, scope, config precedence, distribution
+| Document | Description |
+|----------|-------------|
+| [Architecture Overview](documents/00-architecture.md) | Hook surface, module layout, OpenCode integration |
+| [Error Classification](documents/01-error-patterns.md) | Decision table, pattern matching, retry-after parsing |
+| [Quarantine Strategy](documents/02-quarantine-strategy.md) | Exponential backoff, cap, recovery semantics |
+| [Design Decisions](documents/03-decisions.md) | Naming, scope, config precedence, distribution |
+
+## Contributing
+
+Contributions are welcome. Please open an [issue](https://github.com/bulutmuf/opencode-failover/issues) or submit a [pull request](https://github.com/bulutmuf/opencode-failover/pulls).
 
 ## License
 
-[MIT](LICENSE)
+This project is licensed under the [MIT License](LICENSE).
+
+Copyright (c) 2026 [bulutmuf](https://github.com/bulutmuf)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+<p align="center">
+  Built for <a href="https://opencode.ai">OpenCode</a>
+</p>
