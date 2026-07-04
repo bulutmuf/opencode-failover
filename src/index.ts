@@ -93,23 +93,31 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           const lines: string[] = []
           for (const providerID of pool.allProviderIDs()) {
             const keys = pool.status(providerID)
-            lines.push(`## ${providerID}`)
-            for (const k of keys) {
-              const masked = k.key.length > 7 ? `${k.key.slice(0, 4)}...${k.key.slice(-3)}` : "<key>"
-              const weight = k.weight > 1 ? ` [w=${k.weight}]` : ""
-              const status = k.status === "quarantined"
-                ? `QUARANTINED until ${k.quarantinedUntil ? new Date(k.quarantinedUntil).toISOString() : "now"}`
-                : k.status === "disabled"
-                  ? `DISABLED: ${k.lastErrorMessage || "unknown"}`
-                  : "active"
-              lines.push(`  ${masked}${weight} — ${status}`)
+            lines.push(`## ${displayName(providerID)} (${keys.length} key${keys.length === 1 ? "" : "s"})`)
+          for (const k of keys) {
+            const masked = k.key.length > 7 ? `${k.key.slice(0, 4)}...${k.key.slice(-3)}` : "<key>"
+            const weight = k.weight > 1 ? ` — weight: ${k.weight}x` : ""
+            if (k.status === "active") {
+              lines.push(`  [active]   ${masked}${weight}`)
+            } else if (k.status === "quarantined") {
+              const until = k.quarantinedUntil ? new Date(k.quarantinedUntil).toISOString() : "now"
+              const backoff = k.retryAfterMs ? `${Math.ceil(k.retryAfterMs / 1000)}s` : `${Math.ceil((k.quarantinedUntil - Date.now()) / 1000)}s`
+              lines.push(`  [QUAR]     ${masked}${weight} — until: ${until} (${backoff} backoff, error #${k.consecutiveErrors}: ${k.lastErrorMessage})`)
+            } else {
+              lines.push(`  [DISABLED] ${masked}${weight} — reason: ${k.lastErrorMessage}`)
             }
-            const active = keys.filter((k) => k.status === "active").length
-            const quarantined = keys.filter((k) => k.status === "quarantined").length
-            const disabled = keys.filter((k) => k.status === "disabled").length
-            lines.push(`  [${active} active, ${quarantined} quarantined, ${disabled} disabled]`)
           }
-          return lines.join("\n") || "opencode-failover: No providers configured. Add keys by telling me: 'Add these API keys for <provider>: <key1>, <key2>'"
+          const active = keys.filter((k) => k.status === "active").length
+          const quarantined = keys.filter((k) => k.status === "quarantined").length
+          const disabled = keys.filter((k) => k.status === "disabled").length
+          lines.push(`  ### Summary: ${active} active, ${quarantined} quarantined, ${disabled} disabled — ${keys.length} key${keys.length === 1 ? "" : "s"}`)
+          lines.push("")
+        }
+        const totalProviders = pool.allProviderIDs().length
+        if (totalProviders === 0) {
+          return "opencode-failover: No providers configured. Add keys by telling me: 'Add these API keys for <provider>: <key1>, <key2>'"
+        }
+        return lines.join("\n")
         },
       }),
 
@@ -133,7 +141,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           log(input, `saved ${newKeys.length} key(s) for ${provider} (total: ${merged.length})`, { provider, added: newKeys.length, total: merged.length })
           await input.client.tui.showToast({
             body: {
-              message: `Saved ${newKeys.length} key(s) for ${displayName(provider)}. Total: ${merged.length} key(s).`,
+              message: `opencode-failover: Saved ${newKeys.length} key(s) for ${displayName(provider)}. Total: ${merged.length} key(s).`,
               variant: "success",
             },
           })
@@ -154,7 +162,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           const existingKeys = existingRaw ? existingRaw.split(",").map((k) => k.trim()).filter(Boolean) : []
           if (existingKeys.length === 0) {
             await input.client.tui.showToast({
-              body: { message: `No keys found for ${displayName(provider)}.`, variant: "info" },
+              body: {               message: `opencode-failover: No keys found for ${displayName(provider)}.`, variant: "info" },
             })
             return `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
           }
@@ -163,7 +171,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
             const remaining = existingKeys.filter((k) => !toRemove.includes(k))
             if (remaining.length === existingKeys.length) {
               await input.client.tui.showToast({
-                body: { message: `Key(s) not found for ${displayName(provider)}.`, variant: "info" },
+                body: { message: `opencode-failover: No matching keys found for ${displayName(provider)}.`, variant: "warning" },
               })
               return `opencode-failover: Specified key(s) not found for ${displayName(provider)} in ${envPath}.`
             }
@@ -178,7 +186,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
             const removedCount = existingKeys.length - remaining.length
             log(input, `removed ${removedCount} key(s) from ${provider} (total remaining: ${remaining.length})`, { provider, removed: removedCount, remaining: remaining.length })
             await input.client.tui.showToast({
-              body: { message: `Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining.`, variant: "success" },
+              body: {               message: `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. ${remaining.length} remaining.`, variant: "success" },
             })
             return `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining in ${envPath}.`
           }
@@ -187,7 +195,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           pool.register(provider, { keys: [], header: "Authorization", scheme: "Bearer" })
           log(input, `removed all ${existingKeys.length} key(s) for ${provider}`, { provider, count: existingKeys.length })
           await input.client.tui.showToast({
-            body: { message: removed ? `Removed all ${existingKeys.length} key(s) from ${displayName(provider)}.` : `No keys found for ${displayName(provider)}.`, variant: removed ? "success" : "info" },
+            body: { message: removed ? `opencode-failover: Removed all ${existingKeys.length} key(s) from ${displayName(provider)}.` : `opencode-failover: No keys found for ${displayName(provider)}.`, variant: removed ? "success" : "info" },
           })
           return removed ? `opencode-failover: Removed all ${existingKeys.length} key(s) from ${displayName(provider)} in ${envPath}.` : `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
         },
@@ -211,20 +219,20 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
             if (containsAuthError(error, authHeader)) {
               if (result.action === ErrorAction.Disable) {
                 pool.disable(providerID, k.key, result.reason)
-                log(input, `disabled key for ${providerID}: ${result.reason}`, {
-                  providerID,
-                  reason: result.reason,
-                  sessionID: properties?.sessionID,
-                })
+                const masked = k.key.length > 7 ? `${k.key.slice(0, 4)}...${k.key.slice(-3)}` : "<key>"
+                const toastMsg = `opencode-failover: ${displayName(providerID)} key ${masked} disabled — ${result.reason}. Remove and replace this key.`
+                log(input, `disabled key for ${providerID}: ${result.reason}`, { providerID, reason: result.reason, sessionID: properties?.sessionID })
+                await input.client.tui.showToast({ body: { message: toastMsg, variant: "error" } })
               }
               if (result.action === ErrorAction.Rotate) {
                 pool.quarantine(providerID, k.key, result.retryAfterMs, result.reason)
-                log(input, `quarantined key for ${providerID} (${result.retryAfterMs ?? "default"}ms): ${result.reason}`, {
-                  providerID,
-                  retryAfterMs: result.retryAfterMs,
-                  reason: result.reason,
-                  sessionID: properties?.sessionID,
-                })
+                const masked = k.key.length > 7 ? `${k.key.slice(0, 4)}...${k.key.slice(-3)}` : "<key>"
+                const activeKeys = pool.status(providerID).filter((x) => x.status === "active" && x.key !== k.key).length
+                const remaining = activeKeys > 0 ? ` Switched to next key.` : ` No other keys available — retrying after backoff.`
+                const backoffSec = result.retryAfterMs ? Math.ceil(result.retryAfterMs / 1000) : 60
+                const toastMsg = `opencode-failover: ${displayName(providerID)} key ${masked} hit ${result.reason}. Quarantined for ${backoffSec}s.${remaining}`
+                log(input, `quarantined key for ${providerID} (${result.retryAfterMs ?? "default"}ms): ${result.reason}`, { providerID, retryAfterMs: result.retryAfterMs, reason: result.reason, sessionID: properties?.sessionID })
+                await input.client.tui.showToast({ body: { message: toastMsg, variant: "warning" } })
               }
               break
             }

@@ -29,23 +29,24 @@ export function classify(raw: unknown): ClassifierResult {
   const retryAfterMs = parseRetryAfter(headers as Record<string, string>)
 
   if (status === 429 || is429Overloaded(body, message)) {
-    return { action: ErrorAction.Rotate, retryAfterMs, reason: `Rate limited (${status})` }
+    return { action: ErrorAction.Rotate, retryAfterMs, reason: `Rate limited — HTTP ${status}` }
   }
 
   if (status === 401 || status === 403 || status === 402) {
-    return { action: ErrorAction.Disable, retryAfterMs: null, reason: `Auth/billing failed (${status})` }
+    const label = status === 402 ? "Payment required" : status === 401 ? "Authentication failed" : "Forbidden"
+    return { action: ErrorAction.Disable, retryAfterMs: null, reason: `${label} — HTTP ${status}` }
   }
 
   if (status >= 500 && status < 600) {
-    return { action: ErrorAction.Rotate, retryAfterMs: null, reason: `Server error (${status})` }
+    return { action: ErrorAction.Rotate, retryAfterMs: null, reason: `Server error — HTTP ${status}` }
   }
 
   if (isRetryable && status >= 400) {
-    return { action: ErrorAction.Rotate, retryAfterMs, reason: `Retryable error (${status})` }
+    return { action: ErrorAction.Rotate, retryAfterMs, reason: `Retryable client error — HTTP ${status}` }
   }
 
   if (hasRateLimitPattern(body, message)) {
-    return { action: ErrorAction.Rotate, retryAfterMs, reason: "Rate limit pattern detected" }
+    return { action: ErrorAction.Rotate, retryAfterMs, reason: `Rate limit — pattern: ${detectPattern(body, message)}` }
   }
 
   return { action: ErrorAction.Ignore, retryAfterMs: null, reason: "Non-retryable error" }
@@ -76,6 +77,10 @@ function is429Overloaded(body: string, message: string): boolean {
 }
 
 function hasRateLimitPattern(body: string, message: string): boolean {
+  return detectPattern(body, message) !== null
+}
+
+function detectPattern(body: string, message: string): string | null {
   const lower = body.toLowerCase() + message.toLowerCase()
   const patterns = [
     "rate increased too quickly",
@@ -87,17 +92,17 @@ function hasRateLimitPattern(body: string, message: string): boolean {
     "rate_limit",
   ]
   for (const p of patterns) {
-    if (lower.includes(p)) return true
+    if (lower.includes(p)) return `"${p}"`
   }
 
   try {
     const json = JSON.parse(body)
-    if (json?.type === "error" && json?.error?.type === "too_many_requests") return true
+    if (json?.type === "error" && json?.error?.type === "too_many_requests") return `"too_many_requests" (json.type)`
     const code = typeof json?.code === "string" ? json.code : ""
-    if (code.includes("exhausted") || code.includes("unavailable")) return true
-    if (json?.type === "error" && typeof json?.error?.code === "string" && json.error.code.includes("rate_limit")) return true
+    if (code.includes("exhausted") || code.includes("unavailable")) return `"${code}" (json.code)`
+    if (json?.type === "error" && typeof json?.error?.code === "string" && json.error.code.includes("rate_limit")) return `"${json.error.code}" (json.error.code)`
   } catch {
   }
 
-  return false
+  return null
 }
