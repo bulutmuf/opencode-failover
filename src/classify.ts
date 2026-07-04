@@ -41,9 +41,7 @@ export function classify(raw: unknown): ClassifierResult {
     return { action: ErrorAction.Rotate, retryAfterMs: null, reason: `Server error — HTTP ${status}` }
   }
 
-  if (isRetryable && status >= 400) {
-    return { action: ErrorAction.Rotate, retryAfterMs, reason: `Retryable client error — HTTP ${status}` }
-  }
+
 
   if (hasRateLimitPattern(body, message)) {
     return { action: ErrorAction.Rotate, retryAfterMs, reason: `Rate limit — pattern: ${detectPattern(body, message)}` }
