@@ -3,6 +3,7 @@ import { tool } from "@opencode-ai/plugin"
 import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
 import { KeyPool } from "./state.ts"
 import { classify, ErrorAction } from "./classify.ts"
+import { getNativeAuth, removeNativeAuth, restoreNativeAuth } from "./auth.ts"
 
 const DEBUG = Boolean(Bun.env.OPENCODE_FAILOVER_DEBUG)
 
@@ -85,6 +86,18 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           }
         }
       }
+      for (const providerID of pool.allProviderIDs()) {
+        if (pool.hasAuthBackup(providerID)) continue
+        const native = getNativeAuth(providerID)
+        if (native) {
+          removeNativeAuth(providerID)
+          pool.backupAuth(providerID, native)
+          trace(`config: removed native auth for ${providerID}`, { key: native.key.slice(0, 4) + '...' })
+          await input.client.tui.showToast({
+            body: { message: `opencode-failover: Replaced native API key for ${displayName(providerID)} with failover.`, variant: "success" },
+          })
+        }
+      }
       trace(`config hook DONE | pool providers=${pool.allProviderIDs().join(', ') || '(none)'}`)
     },
 
@@ -157,6 +170,14 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           await writeEnvKey(envPath, envKey, merged.join(","))
           Bun.env[envKey] = merged.join(",")
           pool.register(provider, { keys: merged, header: "Authorization", scheme: "Bearer" })
+          if (!pool.hasAuthBackup(provider)) {
+            const native = getNativeAuth(provider)
+            if (native) {
+              removeNativeAuth(provider)
+              pool.backupAuth(provider, native)
+              trace(`keychain-setup: backed up native auth for ${provider}`)
+            }
+          }
           log(input, `saved ${newKeys.length} key(s) for ${provider} (total: ${merged.length})`, { provider, added: newKeys.length, total: merged.length })
           await input.client.tui.showToast({
             body: {
@@ -203,6 +224,10 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
             }
             pool.register(provider, { keys: remaining, header: "Authorization", scheme: "Bearer" })
             const removedCount = existingKeys.length - remaining.length
+            if (remaining.length === 0 && pool.hasAuthBackup(provider)) {
+              restoreNativeAuth(provider, pool.restoreAuth(provider)!)
+              trace(`keychain-remove: restored native auth for ${provider}`)
+            }
             log(input, `removed ${removedCount} key(s) from ${provider} (total remaining: ${remaining.length})`, { provider, removed: removedCount, remaining: remaining.length })
             await input.client.tui.showToast({
               body: {               message: `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. ${remaining.length} remaining.`, variant: "success" },
@@ -212,6 +237,10 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           const removed = await removeEnvKey(envPath, envKey)
           delete Bun.env[envKey]
           pool.register(provider, { keys: [], header: "Authorization", scheme: "Bearer" })
+          if (pool.hasAuthBackup(provider)) {
+            restoreNativeAuth(provider, pool.restoreAuth(provider)!)
+            trace(`keychain-remove: restored native auth for ${provider}`)
+          }
           log(input, `removed all ${existingKeys.length} key(s) for ${provider}`, { provider, count: existingKeys.length })
           await input.client.tui.showToast({
             body: { message: removed ? `opencode-failover: Removed all ${existingKeys.length} key(s) from ${displayName(provider)}.` : `opencode-failover: No keys found for ${displayName(provider)}.`, variant: removed ? "success" : "info" },

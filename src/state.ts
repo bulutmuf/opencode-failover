@@ -1,4 +1,5 @@
 import type { ProviderConfig } from "./config.ts"
+import type { AuthEntry } from "./auth.ts"
 
 export type KeyStatus = "active" | "quarantined" | "disabled"
 
@@ -21,6 +22,7 @@ const QUARANTINE_CAP_MS = 300_000
 export class KeyPool {
   private pools = new Map<string, KeyState[]>()
   private indexes = new Map<string, number>()
+  private authBackups = new Map<string, AuthEntry>()
 
   register(providerID: string, config: ProviderConfig): void {
     const weight = config.weight ?? {}
@@ -102,5 +104,19 @@ export class KeyPool {
 
   allProviderIDs(): string[] {
     return Array.from(this.pools.keys())
+  }
+
+  backupAuth(providerID: string, entry: AuthEntry): void {
+    if (!this.authBackups.has(providerID)) this.authBackups.set(providerID, entry)
+  }
+
+  hasAuthBackup(providerID: string): boolean {
+    return this.authBackups.has(providerID)
+  }
+
+  restoreAuth(providerID: string): AuthEntry | null {
+    const entry = this.authBackups.get(providerID) ?? null
+    this.authBackups.delete(providerID)
+    return entry
   }
 }
