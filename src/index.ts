@@ -6,6 +6,13 @@ import { classify, ErrorAction } from "./classify.ts"
 
 const DEBUG = Boolean(Bun.env.OPENCODE_FAILOVER_DEBUG)
 
+function trace(msg: string, detail?: Record<string, unknown>): void {
+  if (!DEBUG) return
+  const time = new Date().toISOString().slice(11, 23)
+  const suffix = detail ? ` | ${JSON.stringify(detail)}` : ""
+  console.error(`[opencode-failover ${time}] ${msg}${suffix}`)
+}
+
 const PROVIDER_DISPLAY: Record<string, string> = {
   nvidia: "NVIDIA NIM",
   openrouter: "OpenRouter",
@@ -45,47 +52,56 @@ const lastUsed = new Map<string, { providerID: string; key: string }>()
 
 async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks> {
   const pool = new KeyPool()
+  trace(`failoverPlugin init | directory=${input.directory}, opts present=${!!opts}`)
 
   for (const providerID of providerIDs(opts)) {
     const config = validateProviderConfig(providerID, opts)
     pool.register(providerID, config)
+    trace(`plugin init: registered ${providerID}`, { keyCount: config.keys.length })
   }
 
-  if (DEBUG) log(input, `initialized ${pool.allProviderIDs().length} provider pools`)
+  trace(`plugin init DONE | providers=${pool.allProviderIDs().join(', ') || '(none)'}`)
 
   return {
     dispose: async () => {},
 
     config: async (cfg) => {
       const envPath = envFilePath(input.directory)
+      trace(`config hook fired | directory=${input.directory}, envPath=${envPath}`)
       const envVars = readEnvFile(envPath)
+      trace(`env file read | entries=${envVars.size}`, Object.fromEntries(envVars))
       for (const [key, value] of envVars) {
         if (!Bun.env[key]) Bun.env[key] = value
+        trace(`env set: ${key}=${value.slice(0,8)}...`)
       }
-      for (const providerID of providerIDs(opts)) {
+      const ids = providerIDs(opts)
+      trace(`providerIDs discovered: ${ids.join(', ') || '(none)'}`)
+      for (const providerID of ids) {
         if (!pool.allProviderIDs().includes(providerID)) {
           const config = loadProviderConfig(providerID, opts)
-          if (config) pool.register(providerID, config)
+          if (config) {
+            pool.register(providerID, config)
+            trace(`pool registered: ${providerID}`, { keyCount: config.keys.length, header: config.header })
+          }
         }
       }
+      trace(`config hook DONE | pool providers=${pool.allProviderIDs().join(', ') || '(none)'}`)
     },
 
     "chat.headers": async (incoming, output) => {
       const providerID = incoming.model.providerID
+      trace(`chat.headers FIRED | provider=${providerID} session=${incoming.sessionID.slice(0,8)}`)
       const config = loadProviderConfig(providerID, opts)
-      if (!config) return
+      if (!config) {
+        trace(`chat.headers SKIP — no config for ${providerID}`)
+        return
+      }
       const key = pool.pick(providerID)
       const headerValue = `${config.scheme} ${key}`
+      trace(`chat.headers: pool.pick → key masked=${key.length > 4 ? key.slice(0, 4) + '...' + key.slice(-4) : key}, pool status=${pool.status(providerID).map(k => k.status).join(',')}`)
       output.headers = { ...output.headers, [config.header]: headerValue }
       lastUsed.set(incoming.sessionID, { providerID, key })
-      if (DEBUG) {
-        const masked = key.length > 4 ? `${key.slice(0, 4)}...${key.slice(-4)}` : "<short-key>"
-        log(input, `injected key ${masked} for ${providerID}`, {
-          providerID,
-          header: config.header,
-          sessionID: incoming.sessionID,
-        })
-      }
+      trace(`chat.headers DONE | headers set=${config.header}, lastUsed stored`, { sessionID: incoming.sessionID.slice(0,8), headerKey: config.header })
     },
 
     tool: {
@@ -206,17 +222,34 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
     },
 
     event: async ({ event }) => {
-      if (event.type !== "session.error") return
+      trace(`event hook FIRED | type=${event.type}`)
+      if (event.type !== "session.error") {
+        trace(`event SKIP — not session.error (type=${event.type})`)
+        return
+      }
+      trace(`session.error received`)
       const properties = (event as Record<string, unknown>).properties as Record<string, unknown> | undefined
       const error = properties?.error as Record<string, unknown> | undefined
-      if (!error) return
+      trace(`properties present=${!!properties}, error present=${!!error}, sessionID=${(properties?.sessionID as string)?.slice(0,8) ?? 'N/A'}`)
+      if (!error) {
+        trace(`event SKIP — no error in properties`)
+        return
+      }
 
       const result = classify(error)
-      if (result.action === ErrorAction.Ignore) return
+      trace(`classify result: action=${result.action}, reason=${result.reason}`, { status: (error as Record<string, unknown>).statusCode ?? (error as Record<string, unknown>).status })
+      if (result.action === ErrorAction.Ignore) {
+        trace(`event SKIP — classify returned Ignore`)
+        return
+      }
 
       const sessionID = properties?.sessionID as string | undefined
       const entry = sessionID ? lastUsed.get(sessionID) : undefined
-      if (!entry) return
+      trace(`lastUsed lookup | sessionID=${sessionID?.slice(0,8) ?? 'N/A'}, entry=${entry ? entry.providerID + '/' + entry.key.slice(0,4) + '...' : 'NOT FOUND'}`)
+      if (!entry) {
+        trace(`event SKIP — no lastUsed entry for this session. lastUsed has ${lastUsed.size} entries.`)
+        return
+      }
 
       const { providerID, key } = entry
 
@@ -224,7 +257,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
         pool.disable(providerID, key, result.reason)
         const masked = key.length > 7 ? `${key.slice(0, 4)}...${key.slice(-3)}` : "<key>"
         const toastMsg = `opencode-failover: ${displayName(providerID)} key ${masked} disabled — ${result.reason}. Remove and replace this key.`
-        log(input, `disabled key for ${providerID}: ${result.reason}`, { providerID, reason: result.reason, sessionID })
+        trace(`disable action: key=${masked}, reason=${result.reason}`);
         await input.client.tui.showToast({ body: { message: toastMsg, variant: "error" } })
       }
       if (result.action === ErrorAction.Rotate) {
@@ -234,7 +267,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
         const maskedNext = nextKey.length > 7 ? `${nextKey.slice(0, 4)}...${nextKey.slice(-3)}` : "<key>"
         const backoffSec = result.retryAfterMs ? Math.ceil(result.retryAfterMs / 1000) : 60
         const toastMsg = `opencode-failover: [${displayName(providerID)}] Key ${masked} quarantined (${result.reason}). Switching to ${maskedNext} (Backoff: ${backoffSec}s).`
-        log(input, `quarantined key for ${providerID} (${result.retryAfterMs ?? "default"}ms): ${result.reason}`, { providerID, retryAfterMs: result.retryAfterMs, reason: result.reason, sessionID })
+        trace(`rotate action: old=${masked} → new=${maskedNext}, backoff=${backoffSec}s, reason=${result.reason}`);
         await input.client.tui.showToast({ body: { message: toastMsg, variant: "warning" } })
       }
     },
