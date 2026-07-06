@@ -3,7 +3,7 @@ import { tool } from "@opencode-ai/plugin"
 import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
 import { KeyPool } from "./state.ts"
 import { classify, ErrorAction } from "./classify.ts"
-import { getNativeAuth, removeNativeAuth, restoreNativeAuth } from "./auth.ts"
+import { writeAuthKey, removeAuthKey } from "./auth.ts"
 import { startVersionChecker, stopVersionChecker } from "./version-check.ts"
 import { existsSync, readFileSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
@@ -102,7 +102,17 @@ async function autoRegisterTui(input: PluginInput): Promise<boolean> {
   }
 }
 
-const lastUsed = new Map<string, { providerID: string; key: string }>()
+const activeAuthKey = new Map<string, string>()
+
+function trackAuthKey(providerID: string, key: string): void {
+  activeAuthKey.set(providerID, key)
+  writeAuthKey(providerID, key)
+}
+
+function clearAuthKey(providerID: string): void {
+  activeAuthKey.delete(providerID)
+  removeAuthKey(providerID)
+}
 
 async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks> {
   const pool = new KeyPool()
@@ -144,35 +154,18 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
         }
       }
       for (const providerID of pool.allProviderIDs()) {
-        if (pool.hasAuthBackup(providerID)) continue
-        const native = getNativeAuth(providerID)
-        if (native) {
-          removeNativeAuth(providerID)
-          pool.backupAuth(providerID, native)
-          trace(`config: removed native auth for ${providerID}`, { key: native.key.slice(0, 4) + '...' })
+        const keys = pool.status(providerID)
+        const firstActive = keys.find((k) => k.status === "active")
+        if (firstActive) {
+          trackAuthKey(providerID, firstActive.key)
+          trace(`config: wrote auth key for ${providerID}`, { key: firstActive.key.slice(0, 4) + '...' })
           await input.client.tui.showToast({
-            body: { message: `opencode-failover: Replaced native API key for ${displayName(providerID)} with failover.`, variant: "success" },
+            body: { message: `opencode-failover: Failover active for ${displayName(providerID)}. /keychain to select model.`, variant: "success" },
           })
         }
       }
       trace(`config hook DONE | pool providers=${pool.allProviderIDs().join(', ') || '(none)'}`)
       await autoRegisterTui(input)
-    },
-
-    "chat.headers": async (incoming, output) => {
-      const providerID = incoming.model.providerID
-      trace(`chat.headers FIRED | provider=${providerID} session=${incoming.sessionID.slice(0,8)}`)
-      const config = loadProviderConfig(providerID, opts)
-      if (!config) {
-        trace(`chat.headers SKIP — no config for ${providerID}`)
-        return
-      }
-      const key = pool.pick(providerID)
-      const headerValue = `${config.scheme} ${key}`
-      trace(`chat.headers: pool.pick → key masked=${key.length > 4 ? key.slice(0, 4) + '...' + key.slice(-4) : key}, pool status=${pool.status(providerID).map(k => k.status).join(',')}`)
-      output.headers = { ...output.headers, [config.header]: headerValue }
-      lastUsed.set(incoming.sessionID, { providerID, key })
-      trace(`chat.headers DONE | headers set=${config.header}, lastUsed stored`, { sessionID: incoming.sessionID.slice(0,8), headerKey: config.header })
     },
 
     tool: {
@@ -228,14 +221,8 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           await writeEnvKey(envPath, envKey, merged.join(","))
           Bun.env[envKey] = merged.join(",")
           pool.register(provider, { keys: merged, header: "Authorization", scheme: "Bearer" })
-          if (!pool.hasAuthBackup(provider)) {
-            const native = getNativeAuth(provider)
-            if (native) {
-              removeNativeAuth(provider)
-              pool.backupAuth(provider, native)
-              trace(`keychain-setup: backed up native auth for ${provider}`)
-            }
-          }
+          trackAuthKey(provider, merged[0]!)
+          trace(`keychain-setup: wrote auth key for ${provider}`)
           log(input, `saved ${newKeys.length} key(s) for ${provider} (total: ${merged.length})`, { provider, added: newKeys.length, total: merged.length })
           await input.client.tui.showToast({
             body: {
@@ -260,7 +247,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
           const existingKeys = existingRaw ? existingRaw.split(",").map((k) => k.trim()).filter(Boolean) : []
           if (existingKeys.length === 0) {
             await input.client.tui.showToast({
-              body: {               message: `opencode-failover: No keys found for ${displayName(provider)}.`, variant: "info" },
+              body: { message: `opencode-failover: No keys found for ${displayName(provider)}.`, variant: "info" },
             })
             return `opencode-failover: No keys found for ${displayName(provider)} in ${envPath}.`
           }
@@ -276,29 +263,26 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
             if (remaining.length === 0) {
               await removeEnvKey(envPath, envKey)
               delete Bun.env[envKey]
+              clearAuthKey(provider)
+              trace(`keychain-remove: removed auth.json entry for ${provider}`)
             } else {
               await writeEnvKey(envPath, envKey, remaining.join(","))
               Bun.env[envKey] = remaining.join(",")
+              trackAuthKey(provider, remaining[0]!)
             }
             pool.register(provider, { keys: remaining, header: "Authorization", scheme: "Bearer" })
             const removedCount = existingKeys.length - remaining.length
-            if (remaining.length === 0 && pool.hasAuthBackup(provider)) {
-              restoreNativeAuth(provider, pool.restoreAuth(provider)!)
-              trace(`keychain-remove: restored native auth for ${provider}`)
-            }
             log(input, `removed ${removedCount} key(s) from ${provider} (total remaining: ${remaining.length})`, { provider, removed: removedCount, remaining: remaining.length })
             await input.client.tui.showToast({
-              body: {               message: `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. ${remaining.length} remaining.`, variant: "success" },
+              body: { message: `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. ${remaining.length} remaining.`, variant: "success" },
             })
             return `opencode-failover: Removed ${removedCount} key(s) from ${displayName(provider)}. Total: ${remaining.length} remaining in ${envPath}.`
           }
           const removed = await removeEnvKey(envPath, envKey)
           delete Bun.env[envKey]
           pool.register(provider, { keys: [], header: "Authorization", scheme: "Bearer" })
-          if (pool.hasAuthBackup(provider)) {
-            restoreNativeAuth(provider, pool.restoreAuth(provider)!)
-            trace(`keychain-remove: restored native auth for ${provider}`)
-          }
+          clearAuthKey(provider)
+          trace(`keychain-remove: removed all keys + auth.json from ${provider}`)
           log(input, `removed all ${existingKeys.length} key(s) for ${provider}`, { provider, count: existingKeys.length })
           await input.client.tui.showToast({
             body: { message: removed ? `opencode-failover: Removed all ${existingKeys.length} key(s) from ${displayName(provider)}.` : `opencode-failover: No keys found for ${displayName(provider)}.`, variant: removed ? "success" : "info" },
@@ -317,45 +301,54 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
       trace(`session.error received`)
       const properties = (event as Record<string, unknown>).properties as Record<string, unknown> | undefined
       const error = properties?.error as Record<string, unknown> | undefined
-      trace(`properties present=${!!properties}, error present=${!!error}, sessionID=${(properties?.sessionID as string)?.slice(0,8) ?? 'N/A'}`)
       if (!error) {
         trace(`event SKIP — no error in properties`)
         return
       }
 
       const result = classify(error)
-      trace(`classify result: action=${result.action}, reason=${result.reason}`, { status: (error as Record<string, unknown>).statusCode ?? (error as Record<string, unknown>).status })
+      trace(`classify result: action=${result.action}, reason=${result.reason}`)
       if (result.action === ErrorAction.Ignore) {
         trace(`event SKIP — classify returned Ignore`)
         return
       }
 
-      const sessionID = properties?.sessionID as string | undefined
-      const entry = sessionID ? lastUsed.get(sessionID) : undefined
-      trace(`lastUsed lookup | sessionID=${sessionID?.slice(0,8) ?? 'N/A'}, entry=${entry ? entry.providerID + '/' + entry.key.slice(0,4) + '...' : 'NOT FOUND'}`)
-      if (!entry) {
-        trace(`event SKIP — no lastUsed entry for this session. lastUsed has ${lastUsed.size} entries.`)
+      let matchedProviderID: string | null = null
+      let matchedKey: string | null = null
+      for (const [providerID, key] of activeAuthKey.entries()) {
+        const poolKeys = pool.status(providerID)
+        if (poolKeys.some((k) => k.key === key)) {
+          matchedProviderID = providerID
+          matchedKey = key
+          break
+        }
+      }
+      if (!matchedProviderID || !matchedKey) {
+        trace(`event SKIP — no active key matched in pool. activeAuthKey.size=${activeAuthKey.size}`)
         return
       }
+      const providerID = matchedProviderID
+      const authKey = matchedKey
 
-      const { providerID, key } = entry
+      const masked = authKey.length > 7 ? `${authKey.slice(0, 4)}...${authKey.slice(-3)}` : "<key>"
 
       if (result.action === ErrorAction.Disable) {
-        pool.disable(providerID, key, result.reason)
-        const masked = key.length > 7 ? `${key.slice(0, 4)}...${key.slice(-3)}` : "<key>"
-        const toastMsg = `opencode-failover: ${displayName(providerID)} key ${masked} disabled — ${result.reason}. Remove and replace this key.`
-        trace(`disable action: key=${masked}, reason=${result.reason}`);
-        await input.client.tui.showToast({ body: { message: toastMsg, variant: "error" } })
+        pool.disable(providerID, authKey, result.reason)
+        const nextKey = pool.pick(providerID)
+        trackAuthKey(providerID, nextKey)
+        await input.client.tui.showToast({
+          body: { message: `opencode-failover: ${displayName(providerID)} key ${masked} disabled — ${result.reason}`, variant: "error" },
+        })
       }
       if (result.action === ErrorAction.Rotate) {
-        pool.quarantine(providerID, key, result.retryAfterMs, result.reason)
-        const masked = key.length > 7 ? `${key.slice(0, 4)}...${key.slice(-3)}` : "<key>"
+        pool.quarantine(providerID, authKey, result.retryAfterMs, result.reason)
         const nextKey = pool.pick(providerID)
+        trackAuthKey(providerID, nextKey)
         const maskedNext = nextKey.length > 7 ? `${nextKey.slice(0, 4)}...${nextKey.slice(-3)}` : "<key>"
         const backoffSec = result.retryAfterMs ? Math.ceil(result.retryAfterMs / 1000) : 60
-        const toastMsg = `opencode-failover: [${displayName(providerID)}] Key ${masked} quarantined (${result.reason}). Switching to ${maskedNext} (Backoff: ${backoffSec}s).`
-        trace(`rotate action: old=${masked} → new=${maskedNext}, backoff=${backoffSec}s, reason=${result.reason}`);
-        await input.client.tui.showToast({ body: { message: toastMsg, variant: "warning" } })
+        await input.client.tui.showToast({
+          body: { message: `opencode-failover: [${displayName(providerID)}] Key ${masked} quarantined (${result.reason}). Switching to ${maskedNext} (${backoffSec}s).`, variant: "warning" },
+        })
       }
     },
   }
