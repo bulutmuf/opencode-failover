@@ -1,5 +1,6 @@
 import type { ProviderConfig } from "./config.ts"
 import type { AuthEntry } from "./auth.ts"
+import { writeSharedState, type SharedProviderState, type SharedKeyState } from "./shared.ts"
 
 export type KeyStatus = "active" | "quarantined" | "disabled"
 
@@ -19,10 +20,63 @@ export type KeyMetadata = Pick<KeyState, "status" | "quarantinedUntil" | "consec
 const QUARANTINE_BASE_MS = 60_000
 const QUARANTINE_CAP_MS = 300_000
 
+const PROVIDER_DISPLAY: Record<string, string> = {
+  nvidia: "NVIDIA NIM",
+  openrouter: "OpenRouter",
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+  groq: "Groq",
+  mistral: "Mistral",
+  deepseek: "DeepSeek",
+  copilot: "GitHub Copilot",
+  together: "Together AI",
+  fireworks: "Fireworks AI",
+  perplexity: "Perplexity",
+  anyscale: "Anyscale",
+  replicate: "Replicate",
+  aws: "AWS Bedrock",
+  azure: "Azure OpenAI",
+  cloudflare: "Cloudflare Workers AI",
+}
+
+function displayName(id: string): string {
+  return PROVIDER_DISPLAY[id.toLowerCase()] ?? id.charAt(0).toUpperCase() + id.slice(1)
+}
+
+function maskKey(key: string): string {
+  if (key.length <= 7) return "<key>"
+  return `${key.slice(0, 4)}...${key.slice(-3)}`
+}
+
 export class KeyPool {
   private pools = new Map<string, KeyState[]>()
   private indexes = new Map<string, number>()
   private authBackups = new Map<string, AuthEntry>()
+
+  private serialize(): void {
+    const providers: SharedProviderState[] = []
+    for (const providerID of this.pools.keys()) {
+      const keys = this.pools.get(providerID)!
+      const sharedKeys: SharedKeyState[] = keys.map((k) => ({
+        key: maskKey(k.key),
+        status: k.status,
+        weight: k.weight,
+        quarantinedUntil: k.quarantinedUntil,
+        consecutiveErrors: k.consecutiveErrors,
+        lastErrorAt: k.lastErrorAt,
+        lastErrorMessage: k.lastErrorMessage,
+        retryAfterMs: k.retryAfterMs,
+      }))
+      providers.push({
+        id: providerID,
+        name: displayName(providerID),
+        keys: sharedKeys,
+        hasNativeBackup: this.authBackups.has(providerID),
+      })
+    }
+    writeSharedState(providers)
+  }
 
   register(providerID: string, config: ProviderConfig): void {
     const weight = config.weight ?? {}
@@ -41,6 +95,7 @@ export class KeyPool {
       })),
     )
     this.indexes.set(providerID, 0)
+    this.serialize()
   }
 
   private pool(providerID: string): KeyState[] {
@@ -88,6 +143,7 @@ export class KeyPool {
     entry.lastErrorAt = Date.now()
     entry.lastErrorMessage = reason
     entry.retryAfterMs = retryAfterMs
+    this.serialize()
   }
 
   disable(providerID: string, key: string, reason: string): void {
@@ -96,6 +152,7 @@ export class KeyPool {
     entry.status = "disabled"
     entry.lastErrorAt = Date.now()
     entry.lastErrorMessage = reason
+    this.serialize()
   }
 
   status(providerID: string): KeyState[] {

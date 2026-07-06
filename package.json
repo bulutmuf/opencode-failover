@@ -1,6 +1,6 @@
 {
   "name": "opencode-failover",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "OpenCode plugin for automatic API-key failover and rotation across multiple provider keys",
   "type": "module",
   "license": "MIT",
@@ -24,7 +24,14 @@
     "llm"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    "./server": {
+      "import": "./src/index.ts",
+      "config": {}
+    },
+    "./tui": {
+      "import": "./src/tui.tsx",
+      "config": {}
+    }
   },
   "main": "./src/index.ts",
   "scripts": {
