@@ -75,7 +75,6 @@ const tui: TuiPlugin = async (api) => {
           title,
           value: { providerID: p.id, modelID: mid, label: title },
           description: name,
-          category: name,
         })
       }
     }
