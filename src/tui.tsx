@@ -72,17 +72,24 @@ const tui: TuiPlugin = async (api) => {
       api.ui.toast({ variant: "error", message: `opencode-failover: provider.list() failed: ${String(e)}`, duration: 8000 })
       providerData = [...api.state.provider] as typeof providerData
     }
-    const options: Array<{ title: string; value: unknown; description: string }> = []
+    const options: Array<{ title: string; value: unknown; description: string; category: string }> = []
 
     for (const p of providerData) {
       if (!keychainIds.has(p.id)) continue
       const name = displayName(p.id)
+      const kp = keychain?.providers.find((x) => x.id === p.id)
+      const active = kp?.keys.filter((k) => k.status === "active").length ?? 0
+      const quarantined = kp?.keys.filter((k) => k.status === "quarantined").length ?? 0
+      const parts = [`${active} active`]
+      if (quarantined) parts.push(`${quarantined} quarantined`)
+      const category = `${name}  —  ${parts.join(" · ")}`
       for (const [mid, m] of Object.entries(p.models ?? {})) {
         const title = (m as Record<string, string>).name ?? mid
         options.push({
           title,
           value: { providerID: p.id, modelID: mid, label: title },
           description: name,
+          category,
         })
       }
     }
