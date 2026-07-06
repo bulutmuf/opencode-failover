@@ -89,8 +89,9 @@ const tui: TuiPlugin = async (api) => {
       options,
       onSelect(opt: { value: { providerID: string; modelID: string } }) {
         const { providerID, modelID } = opt.value
-        const route = api.route.current
-        const sessionID = (route.params as Record<string, string> | undefined)?.session_id
+        const sessionID = ("params" in api.route.current)
+          ? api.route.current.params?.sessionID as string | undefined
+          : undefined
         if (!sessionID) {
           api.ui.toast({ message: "opencode-failover: Open a chat session first.", variant: "warning", duration: 3000 })
           api.ui.dialog.clear()
