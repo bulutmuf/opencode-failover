@@ -64,7 +64,7 @@ const tui: TuiPlugin = async (api) => {
     }
 
     const providerData = [...api.state.provider]
-    const options: Array<{ title: string; value: unknown; description: string; category: string }> = []
+    const options: Array<{ title: string; value: unknown; category: string }> = []
 
     for (const p of providerData) {
       if (!keychainIds.has(p.id)) continue
@@ -74,7 +74,6 @@ const tui: TuiPlugin = async (api) => {
         options.push({
           title,
           value: { providerID: p.id, modelID: mid, label: title },
-          description: name,
           category: name,
         })
       }
