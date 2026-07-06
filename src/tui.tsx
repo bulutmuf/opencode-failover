@@ -38,8 +38,10 @@ function readSharedState(): SharedState | null {
   catch { return null }
 }
 
-// ponytail: keystroke injection — external plugins can't call local.model.set(),
-// so we simulate typing into the built-in model picker (same as opencode-balancer)
+// ponytail: keystroke injection — opencode's TUI plugin API
+// does not expose local.model.set(). Keystroke injection through
+// the built-in model.list dialog is the only known workaround
+// (same approach used by @thelioo/opencode-balancer).
 function feedKeystrokes(api: TuiPluginApi, text: string, delay: number): void {
   setTimeout(() => {
     const stdin = (api.renderer as unknown as { stdin?: { emit: (e: string, d: unknown) => unknown } }).stdin
@@ -67,17 +69,12 @@ const tui: TuiPlugin = async (api) => {
     for (const p of providerData) {
       if (!keychainIds.has(p.id)) continue
       const name = displayName(p.id)
-      const kp = keychain?.providers.find((x) => x.id === p.id)
-      const active = kp?.keys.filter((k) => k.status === "active").length ?? 0
-      const quarantined = kp?.keys.filter((k) => k.status === "quarantined").length ?? 0
-      const keysInfo = `Keys: ${active} active${quarantined ? `, ${quarantined} quarantined` : ""}`
-
       for (const [mid, m] of Object.entries(p.models ?? {})) {
         const title = (m as Record<string, string>).name ?? mid
         options.push({
           title,
           value: { providerID: p.id, modelID: mid, label: title },
-          description: `${name} — ${keysInfo}`,
+          description: name,
           category: name,
         })
       }
@@ -100,11 +97,13 @@ const tui: TuiPlugin = async (api) => {
       onSelect(opt: { value: { providerID: string; modelID: string; label: string } }) {
         const { label } = opt.value
         api.ui.dialog.clear()
-        api.keymap.dispatchCommand("model.list")
 
-        feedKeystrokes(api, label, 90)
-        feedKeystrokes(api, "\r", 180)
-        feedKeystrokes(api, "\x1b", 280)
+        setTimeout(() => {
+          api.keymap.dispatchCommand("model.list")
+          feedKeystrokes(api, label, 150)
+          feedKeystrokes(api, "\r", 230)
+          feedKeystrokes(api, "\x1b", 310)
+        }, 50)
       },
     }))
   }
