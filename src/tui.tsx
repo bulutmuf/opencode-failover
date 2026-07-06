@@ -67,7 +67,11 @@ const tui: TuiPlugin = async (api) => {
     try {
       const res = await api.client.provider.list({})
       providerData = (res as { all?: unknown[] }).all as typeof providerData ?? []
-    } catch {
+      if (providerData.length === 0) {
+        api.ui.toast({ variant: "warning", message: `opencode-failover: provider.list() returned ${providerData.length} providers. res keys: ${Object.keys(res as object).join(", ")}`, duration: 8000 })
+      }
+    } catch (e) {
+      api.ui.toast({ variant: "error", message: `opencode-failover: provider.list() failed: ${String(e)}`, duration: 8000 })
       providerData = [...api.state.provider] as typeof providerData
     }
     const options: Array<{ title: string; value: unknown; description: string }> = []
