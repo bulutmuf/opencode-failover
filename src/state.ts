@@ -1,5 +1,4 @@
 import type { ProviderConfig } from "./config.ts"
-import type { AuthEntry } from "./auth.ts"
 import { writeSharedState, type SharedProviderState, type SharedKeyState } from "./shared.ts"
 
 export type KeyStatus = "active" | "quarantined" | "disabled"
@@ -52,7 +51,6 @@ function maskKey(key: string): string {
 export class KeyPool {
   private pools = new Map<string, KeyState[]>()
   private indexes = new Map<string, number>()
-  private authBackups = new Map<string, AuthEntry>()
 
   private serialize(): void {
     const providers: SharedProviderState[] = []
@@ -72,7 +70,6 @@ export class KeyPool {
         id: providerID,
         name: displayName(providerID),
         keys: sharedKeys,
-        hasNativeBackup: this.authBackups.has(providerID),
       })
     }
     writeSharedState(providers)
@@ -161,19 +158,5 @@ export class KeyPool {
 
   allProviderIDs(): string[] {
     return Array.from(this.pools.keys())
-  }
-
-  backupAuth(providerID: string, entry: AuthEntry): void {
-    if (!this.authBackups.has(providerID)) this.authBackups.set(providerID, entry)
-  }
-
-  hasAuthBackup(providerID: string): boolean {
-    return this.authBackups.has(providerID)
-  }
-
-  restoreAuth(providerID: string): AuthEntry | null {
-    const entry = this.authBackups.get(providerID) ?? null
-    this.authBackups.delete(providerID)
-    return entry
   }
 }

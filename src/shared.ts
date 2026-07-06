@@ -17,7 +17,6 @@ export interface SharedProviderState {
   id: string
   name: string
   keys: SharedKeyState[]
-  hasNativeBackup: boolean
 }
 
 export interface SharedState {
