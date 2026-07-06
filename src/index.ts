@@ -60,7 +60,7 @@ function tuiJsonPath(): string {
   return path.join(configDir, "tui.json")
 }
 
-const TUI_PLUGIN_ID = "opencode-failover"
+const TUI_PLUGIN_PATH = "./plugins/failover-tui.tsx"
 
 async function autoRegisterTui(input: PluginInput): Promise<boolean> {
   const tuiPath = tuiJsonPath()
@@ -73,9 +73,9 @@ async function autoRegisterTui(input: PluginInput): Promise<boolean> {
     tuiConfig = {}
   }
   const plugins = Array.isArray(tuiConfig.plugin) ? tuiConfig.plugin : []
-  const already = plugins.some((p: unknown) => p === TUI_PLUGIN_ID || (Array.isArray(p) && p[0] === TUI_PLUGIN_ID))
+  const already = plugins.some((p: unknown) => p === TUI_PLUGIN_PATH || (Array.isArray(p) && p[0] === TUI_PLUGIN_PATH))
   if (already) {
-    trace(`tui.json: ${TUI_PLUGIN_ID} already registered`)
+    trace(`tui.json: ${TUI_PLUGIN_PATH} already registered`)
     return false
   }
   try {
@@ -84,14 +84,14 @@ async function autoRegisterTui(input: PluginInput): Promise<boolean> {
       await writeFile(bakPath, readFileSync(tuiPath, "utf-8"))
       trace(`tui.json backed up to ${bakPath}`)
     }
-    tuiConfig.plugin = [...plugins, TUI_PLUGIN_ID]
+    tuiConfig.plugin = [...plugins, TUI_PLUGIN_PATH]
     const dir = path.dirname(tuiPath)
     if (!existsSync(dir)) {
       const { mkdir } = await import("node:fs/promises")
       await mkdir(dir, { recursive: true })
     }
     await writeFile(tuiPath, JSON.stringify(tuiConfig, null, 2), "utf-8")
-    trace(`tui.json: registered ${TUI_PLUGIN_ID}`)
+    trace(`tui.json: registered ${TUI_PLUGIN_PATH}`)
     await input.client.tui.showToast({
       body: { message: "opencode-failover: TUI dashboard enabled. Restart to see /keychain.", variant: "info", duration: 8000 },
     })
