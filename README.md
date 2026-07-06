@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/Bun-1.0+-FBF0DF?style=flat-square&logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/OpenCode-1.17+-FF6B35?style=flat-square" alt="OpenCode">
   <a href="https://github.com/bulutmuf/opencode-failover/issues"><img src="https://img.shields.io/github/issues/bulutmuf/opencode-failover?style=flat-square" alt="Issues"></a>
-  <img src="https://img.shields.io/badge/Test-28%2F28-4CAF50?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/Test-40-orange?style=flat-square" alt="Tests">
 </p>
 
 <p align="center">
@@ -95,6 +95,7 @@ One provider, multiple keys, zero downtime.
 - Temporary quarantine on server errors (5xx)
 - Rate-limit pattern detection ([Anthropic](https://docs.anthropic.com), [OpenAI](https://platform.openai.com/docs), and generic patterns)
 - [`keychain-status`](#tools-llm-natural-language) tool for real-time key monitoring
+- [/keychain slash command](#tui-dashboard) for live key status in the TUI
 - Debug logging via `OPENCODE_FAILOVER_DEBUG=1`
 - Works with any [OpenCode](https://opencode.ai)-compatible provider
 
@@ -255,6 +256,24 @@ Example output:
   [2 active, 1 quarantined, 0 disabled]
 ```
 
+## TUI Dashboard
+
+Type `/keychain` in the prompt (or `/failover`, `/opencode-failover`) to open the keychain dashboard:
+
+```
+Keychain
+─────────
+NVIDIA NIM (3 keys: 2 active, 1 quarantined, 0 disabled)
+  nvapi...abc (1x) [OK]
+  nvapi...def (1x) [120s]
+  nvapi...ghi (1x) [OK]
+  [native key backed up]
+```
+
+Shows all configured providers with masked keys, live status, and native key backup state. The dashboard is read-only — use LLM tools (`keychain-setup`/`keychain-remove`) to manage keys.
+
+The TUI plugin auto-registers on first start. A `~/.config/opencode/tui.json` backup is created before any changes.
+
 ## Supported Providers
 
 Works with any provider that uses API key authentication:
@@ -290,13 +309,18 @@ Logs key injection, quarantine decisions, and provider pool initialization.
 
 ```
 src/
-  index.ts          Plugin factory: hooks wiring + tool
+  index.ts          Plugin factory: hooks wiring + tools
   config.ts         Env + options parser
   state.ts          KeyPool: rotation, quarantine, backoff
   classify.ts       Error classifier: status/body -> action
+  auth.ts           Native key backup/restore from auth.json
+  shared.ts         Masked state file (~/.opencode/failover-state.json)
+  version-check.ts  npm registry poll for new versions
+  tui.tsx           TUI dashboard: /keychain slash command
   state.test.ts     7 tests for rotation and quarantine
   classify.test.ts  14 tests for error classification
   config.test.ts    7 tests for env provider discovery
+  auth.test.ts      12 tests for auth.json operations
 documents/
   00-architecture.md
   01-error-patterns.md
