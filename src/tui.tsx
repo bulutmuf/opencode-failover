@@ -129,25 +129,27 @@ const tui: TuiPlugin = async (api) => {
             model: { id: modelID, providerID, variant: "default" },
           }).then(() => {
             api.ui.toast({
-              message: `openencode-failover: Model set to ${displayName(providerID)} / ${modelID}. New sessions will use this model.`,
+              message: `openencode-failover: Model set, opening picker. Select "${modelID}" from ${displayName(providerID)}.`,
               variant: "success",
-              duration: 5000,
+              duration: 8000,
             })
           }).catch(() => {
             api.ui.toast({
-              message: `openencode-failover: Model saved. Restart or start new session.`,
+              message: `openencode-failover: Model saved for next sessions.`,
               variant: "info",
               duration: 4000,
             })
           })
+          api.ui.dialog.clear()
+          api.keymap.dispatchCommand("model.list")
         } else {
           api.ui.toast({
-            message: `openencode-failover: Model set to ${displayName(providerID)} / ${modelID}. Will be used for new sessions.`,
+            message: `openencode-failover: Model set for new sessions.`,
             variant: "success",
             duration: 4000,
           })
+          api.ui.dialog.clear()
         }
-        api.ui.dialog.clear()
       },
     }))
   }
