@@ -4,6 +4,11 @@ import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, r
 import { KeyPool } from "./state.ts"
 import { classify, ErrorAction } from "./classify.ts"
 import { getNativeAuth, removeNativeAuth, restoreNativeAuth } from "./auth.ts"
+import { startVersionChecker, stopVersionChecker } from "./version-check.ts"
+import { existsSync, readFileSync } from "node:fs"
+import { writeFile } from "node:fs/promises"
+import path from "node:path"
+import os from "node:os"
 
 const DEBUG = Boolean(Bun.env.OPENCODE_FAILOVER_DEBUG)
 
@@ -49,6 +54,54 @@ function log(input: PluginInput, message: string, extra?: Record<string, unknown
   })
 }
 
+function tuiJsonPath(): string {
+  const configDir = Bun.env.OPENCODE_CONFIG_DIR
+    || path.join(os.homedir(), ".config", "opencode")
+  return path.join(configDir, "tui.json")
+}
+
+const TUI_PLUGIN_ID = "opencode-failover"
+
+async function autoRegisterTui(input: PluginInput): Promise<boolean> {
+  const tuiPath = tuiJsonPath()
+  let tuiConfig: Record<string, unknown> = {}
+  try {
+    if (existsSync(tuiPath)) {
+      tuiConfig = JSON.parse(readFileSync(tuiPath, "utf-8"))
+    }
+  } catch {
+    tuiConfig = {}
+  }
+  const plugins = Array.isArray(tuiConfig.plugin) ? tuiConfig.plugin : []
+  const already = plugins.some((p: unknown) => p === TUI_PLUGIN_ID || (Array.isArray(p) && p[0] === TUI_PLUGIN_ID))
+  if (already) {
+    trace(`tui.json: ${TUI_PLUGIN_ID} already registered`)
+    return false
+  }
+  try {
+    const bakPath = tuiPath + ".bak"
+    if (existsSync(tuiPath)) {
+      await writeFile(bakPath, readFileSync(tuiPath, "utf-8"))
+      trace(`tui.json backed up to ${bakPath}`)
+    }
+    tuiConfig.plugin = [...plugins, TUI_PLUGIN_ID]
+    const dir = path.dirname(tuiPath)
+    if (!existsSync(dir)) {
+      const { mkdir } = await import("node:fs/promises")
+      await mkdir(dir, { recursive: true })
+    }
+    await writeFile(tuiPath, JSON.stringify(tuiConfig, null, 2), "utf-8")
+    trace(`tui.json: registered ${TUI_PLUGIN_ID}`)
+    await input.client.tui.showToast({
+      body: { message: "opencode-failover: TUI dashboard enabled. Restart to see /keychain.", variant: "info", duration: 8000 },
+    })
+    return true
+  } catch (e) {
+    trace(`tui.json: failed to register`, { error: String(e) })
+    return false
+  }
+}
+
 const lastUsed = new Map<string, { providerID: string; key: string }>()
 
 async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks> {
@@ -63,8 +116,12 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
 
   trace(`plugin init DONE | providers=${pool.allProviderIDs().join(', ') || '(none)'}`)
 
+  startVersionChecker(input)
+
   return {
-    dispose: async () => {},
+    dispose: async () => {
+      stopVersionChecker()
+    },
 
     config: async (cfg) => {
       const envPath = envFilePath(input.directory)
@@ -99,6 +156,7 @@ async function failoverPlugin(input: PluginInput, opts?: unknown): Promise<Hooks
         }
       }
       trace(`config hook DONE | pool providers=${pool.allProviderIDs().join(', ') || '(none)'}`)
+      await autoRegisterTui(input)
     },
 
     "chat.headers": async (incoming, output) => {
