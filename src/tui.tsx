@@ -38,36 +38,13 @@ function readSharedState(): SharedState | null {
   catch { return null }
 }
 
-function modelLabel(name: string, family?: string): string {
-  return family ? `${name} (${family})` : name
-}
-
-function modelJsonPath(): string {
-  const configDir = Bun.env.OPENCODE_CONFIG_DIR
-    || path.join(os.homedir(), ".config", "opencode")
-  return path.join(configDir, "model.json")
-}
-
-function setModelInFile(providerID: string, modelID: string): void {
-  const fp = modelJsonPath()
-  let data: Record<string, unknown> = { model: {}, recent: [], favorite: [], variant: {} }
-  if (existsSync(fp)) {
-    try { data = JSON.parse(readFileSync(fp, "utf-8")) as Record<string, unknown> }
-    catch { /* keep default */ }
-  }
-  const modelMap = (data.model as Record<string, Record<string, string>>) ?? {}
-  const entry = { providerID, modelID }
-  const agentKeys = Object.keys(modelMap)
-  if (agentKeys.length === 0) agentKeys.push("default")
-  for (const agent of agentKeys) {
-    modelMap[agent] = entry as Record<string, string>
-  }
-  data.model = modelMap
-  try {
-    Bun.write(fp, JSON.stringify(data, null, 2))
-  } catch {
-    // best-effort
-  }
+// ponytail: keystroke injection — external plugins can't call local.model.set(),
+// so we simulate typing into the built-in model picker (same as opencode-balancer)
+function feedKeystrokes(api: TuiPluginApi, text: string, delay: number): void {
+  setTimeout(() => {
+    const stdin = (api.renderer as unknown as { stdin?: { emit: (e: string, d: unknown) => unknown } }).stdin
+    stdin?.emit("data", Buffer.from(text))
+  }, delay)
 }
 
 const tui: TuiPlugin = async (api) => {
@@ -90,12 +67,17 @@ const tui: TuiPlugin = async (api) => {
     for (const p of providerData) {
       if (!keychainIds.has(p.id)) continue
       const name = displayName(p.id)
+      const kp = keychain?.providers.find((x) => x.id === p.id)
+      const active = kp?.keys.filter((k) => k.status === "active").length ?? 0
+      const quarantined = kp?.keys.filter((k) => k.status === "quarantined").length ?? 0
+      const keysInfo = `Keys: ${active} active${quarantined ? `, ${quarantined} quarantined` : ""}`
 
       for (const [mid, m] of Object.entries(p.models ?? {})) {
+        const title = (m as Record<string, string>).name ?? mid
         options.push({
-          title: modelLabel(m.name ?? mid, (m as Record<string, string>).family),
-          value: { providerID: p.id, modelID: mid },
-          description: name,
+          title,
+          value: { providerID: p.id, modelID: mid, label: title },
+          description: `${name} — ${keysInfo}`,
           category: name,
         })
       }
@@ -115,41 +97,14 @@ const tui: TuiPlugin = async (api) => {
       title: "Keychain — Select Model",
       placeholder: "Search models...",
       options,
-      onSelect(opt: { value: { providerID: string; modelID: string } }) {
-        const { providerID, modelID } = opt.value
-        const sessionID = ("params" in api.route.current)
-          ? api.route.current.params?.sessionID as string | undefined
-          : undefined
+      onSelect(opt: { value: { providerID: string; modelID: string; label: string } }) {
+        const { label } = opt.value
+        api.ui.dialog.clear()
+        api.keymap.dispatchCommand("model.list")
 
-        setModelInFile(providerID, modelID)
-
-        if (sessionID) {
-          void api.client.v2.session.switchModel({
-            sessionID,
-            model: { id: modelID, providerID, variant: "default" },
-          }).then(() => {
-            api.ui.toast({
-              message: `openencode-failover: Model set, opening picker. Select "${modelID}" from ${displayName(providerID)}.`,
-              variant: "success",
-              duration: 8000,
-            })
-          }).catch(() => {
-            api.ui.toast({
-              message: `openencode-failover: Model saved for next sessions.`,
-              variant: "info",
-              duration: 4000,
-            })
-          })
-          api.ui.dialog.clear()
-          api.keymap.dispatchCommand("model.list")
-        } else {
-          api.ui.toast({
-            message: `openencode-failover: Model set for new sessions.`,
-            variant: "success",
-            duration: 4000,
-          })
-          api.ui.dialog.clear()
-        }
+        feedKeystrokes(api, label, 90)
+        feedKeystrokes(api, "\r", 180)
+        feedKeystrokes(api, "\x1b", 280)
       },
     }))
   }
