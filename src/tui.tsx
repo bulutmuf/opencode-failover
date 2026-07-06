@@ -38,25 +38,11 @@ function readSharedState(): SharedState | null {
   catch { return null }
 }
 
-function keySummary(p: SharedProviderState): string {
-  const active = p.keys.filter((k) => k.status === "active").length
-  const quarantined = p.keys.filter((k) => k.status === "quarantined").length
-  const disabled = p.keys.filter((k) => k.status === "disabled").length
-  const parts: string[] = []
-  if (active) parts.push(`${active} active`)
-  if (quarantined) parts.push(`${quarantined} quarantined`)
-  if (disabled) parts.push(`${disabled} disabled`)
-  return parts.join(", ")
-}
-
 function modelLabel(name: string, family?: string): string {
   return family ? `${name} (${family})` : name
 }
 
 const tui: TuiPlugin = async (api) => {
-  const register = () => {
-    // ponytail: re-register on repeated slash to pick up fresh state
-  }
 
   function openDashboard() {
     const keychain = readSharedState()
@@ -75,16 +61,14 @@ const tui: TuiPlugin = async (api) => {
 
     for (const p of providerData) {
       if (!keychainIds.has(p.id)) continue
-      const kp = keychain?.providers.find((x) => x.id === p.id)
-      const summary = kp ? keySummary(kp) : ""
       const name = displayName(p.id)
 
       for (const [mid, m] of Object.entries(p.models ?? {})) {
         options.push({
           title: modelLabel(m.name ?? mid, (m as Record<string, string>).family),
           value: { providerID: p.id, modelID: mid },
-          description: `Provider: ${name} | Keys: ${summary}`,
-          category: `${name}${summary ? ` (${summary})` : ""}`,
+          description: name,
+          category: name,
         })
       }
     }
@@ -104,11 +88,21 @@ const tui: TuiPlugin = async (api) => {
       placeholder: "Search models...",
       options,
       onSelect(opt: { value: { providerID: string; modelID: string } }) {
-        api.ui.toast({
-          message: `openencode-failover: Selected ${opt.value.providerID}/${opt.value.modelID}`,
-          variant: "info",
-          duration: 5000,
-        })
+        const { providerID, modelID } = opt.value
+        const route = api.route.current
+        const sessionID = (route.params as Record<string, string> | undefined)?.session_id
+        if (!sessionID) {
+          api.ui.toast({ message: "opencode-failover: Open a chat session first.", variant: "warning", duration: 3000 })
+          api.ui.dialog.clear()
+          return
+        }
+        void api.client.v2.session.switchModel({ sessionID, model: { id: modelID, providerID, variant: "default" } })
+          .then(() => {
+            api.ui.toast({ message: `openencode-failover: Switched to ${displayName(providerID)} / ${modelID}`, variant: "success", duration: 3000 })
+          })
+          .catch(() => {
+            api.ui.toast({ message: `openencode-failover: Failed to switch model.`, variant: "error", duration: 3000 })
+          })
         api.ui.dialog.clear()
       },
     }))
