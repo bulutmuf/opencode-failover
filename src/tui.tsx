@@ -51,7 +51,7 @@ function feedKeystrokes(api: TuiPluginApi, text: string, delay: number): void {
 
 const tui: TuiPlugin = async (api) => {
 
-  function openDashboard() {
+  async function openDashboard() {
     const keychain = readSharedState()
     const keychainIds = new Set((keychain?.providers ?? []).map((p) => p.id))
     if (keychainIds.size === 0) {
@@ -63,8 +63,14 @@ const tui: TuiPlugin = async (api) => {
       return
     }
 
-    const providerData = [...api.state.provider]
-    const options: Array<{ title: string; value: unknown; category: string }> = []
+    let providerData: Array<{ id: string; models: Record<string, { name?: string }> }> = []
+    try {
+      const res = await api.client.provider.list({})
+      providerData = (res as { all?: unknown[] }).all as typeof providerData ?? []
+    } catch {
+      providerData = [...api.state.provider] as typeof providerData
+    }
+    const options: Array<{ title: string; value: unknown; description: string }> = []
 
     for (const p of providerData) {
       if (!keychainIds.has(p.id)) continue
