@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-07-06
+
+### Added
+
+- **TUI dashboard**: `/keychain` slash command (aliases: `/failover`, `/opencode-failover`) opens a DialogAlert showing provider key status, counts, and native key backup state. No solid-js dependency — pure DialogAlert.
+- **Slash commands**: `/keychain`, `/failover`, `/opencode-failover` all dispatch the same dashboard.
+- **Shared state**: `~/.config/opencode/failover-state.json` with masked keys (e.g., `nvapi-...x4f2`), file permissions `0600`. Server plugin writes on every pool change; TUI plugin reads.
+- **Version checker**: Polls `https://registry.npmjs.org/opencode-failover/latest` every 5 minutes. Shows toast notification on new version.
+- **Auto-register TUI**: `config` hook writes `~/.config/opencode/tui.json` with plugin ID (backs up to `.bak` first). Single `opencode plugin opencode-failover` command sets up both server and TUI.
+- **Dual package**: `exports["./server"]` + `exports["./tui"]` for server-only and TUI-only load paths.
+
+### Changed
+
+- **Package exports**: `"."` → `"./server"` + `"./tui"` with config blocks.
+- **State serialization**: `KeyPool.register()`/`quarantine()`/`disable()` now call `serialize()` to write shared state.
+
+### Fixed
+
+- **TUI import**: Removed `solid-js` direct import — TUI plugin uses pure DialogAlert.
+
+## [0.2.0] — 2026-07-05
+
+### Added
+
+- **Native API key backup/restore**: When keychain keys exist for a provider, the plugin reads opencode's `auth.json`, backs up the native API key (in-memory), and removes it. On `keychain-remove` (all keys), the native key is restored. Survives restart via `config` hook re-scan.
+- **Auth utils**: `src/auth.ts` — `readAuth()`, `getNativeAuth()`, `removeNativeAuth()`, `restoreNativeAuth()` with graceful handling of missing/corrupt `auth.json`.
+- **Auth tests**: 12 tests for auth.json operations (read, write, backup, restore, cycle, edge cases).
+
+### Fixed
+
+- **Event hook**: `containsAuthError()` never matched (no API key in error responses). Replaced with `lastUsed` Map that tracks session→provider/key from `chat.headers`.
+- **Key rotation**: Plugin's `chat.headers` key was overwritten by opencode's native key from `auth.json`. Solved by native key removal.
+- **Remove-all pool sync**: `keychain-remove` (all keys) path now calls `pool.register()` to update in-memory state.
+- **Provider discovery**: `providerIDs()` didn't scan `<ID>_API_KEYS` env vars. Added `discoverEnvProviders()`.
+
 ## [0.1.0] — 2026-07-04
 
 ### Added
