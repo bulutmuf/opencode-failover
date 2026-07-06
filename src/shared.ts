@@ -1,5 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
-import { writeFile, chmod, mkdir } from "node:fs/promises"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs"
 import path from "node:path"
 import os from "node:os"
 
@@ -47,9 +46,9 @@ export function writeSharedState(providers: SharedProviderState[]): void {
   try {
     const filePath = sharedStatePath()
     const dir = path.dirname(filePath)
-    if (!existsSync(dir)) void mkdir(dir, { recursive: true })
-    void writeFile(filePath, JSON.stringify(state, null, 2), "utf-8")
-    void chmod(filePath, 0o600)
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    writeFileSync(filePath, JSON.stringify(state, null, 2), "utf-8")
+    chmodSync(filePath, 0o600)
   } catch {
     // shared state is best-effort
   }
