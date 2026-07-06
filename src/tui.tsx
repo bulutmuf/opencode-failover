@@ -42,6 +42,34 @@ function modelLabel(name: string, family?: string): string {
   return family ? `${name} (${family})` : name
 }
 
+function modelJsonPath(): string {
+  const configDir = Bun.env.OPENCODE_CONFIG_DIR
+    || path.join(os.homedir(), ".config", "opencode")
+  return path.join(configDir, "model.json")
+}
+
+function setModelInFile(providerID: string, modelID: string): void {
+  const fp = modelJsonPath()
+  let data: Record<string, unknown> = { model: {}, recent: [], favorite: [], variant: {} }
+  if (existsSync(fp)) {
+    try { data = JSON.parse(readFileSync(fp, "utf-8")) as Record<string, unknown> }
+    catch { /* keep default */ }
+  }
+  const modelMap = (data.model as Record<string, Record<string, string>>) ?? {}
+  const entry = { providerID, modelID }
+  const agentKeys = Object.keys(modelMap)
+  if (agentKeys.length === 0) agentKeys.push("default")
+  for (const agent of agentKeys) {
+    modelMap[agent] = entry as Record<string, string>
+  }
+  data.model = modelMap
+  try {
+    Bun.write(fp, JSON.stringify(data, null, 2))
+  } catch {
+    // best-effort
+  }
+}
+
 const tui: TuiPlugin = async (api) => {
 
   function openDashboard() {
@@ -92,18 +120,33 @@ const tui: TuiPlugin = async (api) => {
         const sessionID = ("params" in api.route.current)
           ? api.route.current.params?.sessionID as string | undefined
           : undefined
-        if (!sessionID) {
-          api.ui.toast({ message: "opencode-failover: Open a chat session first.", variant: "warning", duration: 3000 })
-          api.ui.dialog.clear()
-          return
+
+        setModelInFile(providerID, modelID)
+
+        if (sessionID) {
+          void api.client.v2.session.switchModel({
+            sessionID,
+            model: { id: modelID, providerID, variant: "default" },
+          }).then(() => {
+            api.ui.toast({
+              message: `openencode-failover: Model set to ${displayName(providerID)} / ${modelID}. New sessions will use this model.`,
+              variant: "success",
+              duration: 5000,
+            })
+          }).catch(() => {
+            api.ui.toast({
+              message: `openencode-failover: Model saved. Restart or start new session.`,
+              variant: "info",
+              duration: 4000,
+            })
+          })
+        } else {
+          api.ui.toast({
+            message: `openencode-failover: Model set to ${displayName(providerID)} / ${modelID}. Will be used for new sessions.`,
+            variant: "success",
+            duration: 4000,
+          })
         }
-        void api.client.v2.session.switchModel({ sessionID, model: { id: modelID, providerID, variant: "default" } })
-          .then(() => {
-            api.ui.toast({ message: `openencode-failover: Switched to ${displayName(providerID)} / ${modelID}`, variant: "success", duration: 3000 })
-          })
-          .catch(() => {
-            api.ui.toast({ message: `openencode-failover: Failed to switch model.`, variant: "error", duration: 3000 })
-          })
         api.ui.dialog.clear()
       },
     }))
