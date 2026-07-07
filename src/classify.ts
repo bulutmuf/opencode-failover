@@ -27,10 +27,13 @@ export function classify(raw: unknown): ClassifierResult {
   const message = String((error as APIError).message ?? (error as Record<string, unknown>).message ?? "")
   const isRetryable = Boolean((error as APIError).isRetryable ?? (error as Record<string, unknown>).isRetryable ?? false)
 
-  const retryAfterMs = parseRetryAfter(headers as Record<string, string>)
+  let retryAfterMs = parseRetryAfter(headers as Record<string, string>)
+  if (retryAfterMs === null) {
+    retryAfterMs = parseBodyRetryAfter(message) ?? parseBodyRetryAfter(body)
+  }
 
   if (hasOverloadPattern(body, message)) {
-    return { action: ErrorAction.Overload, retryAfterMs: 2000, reason: `Server overload — pattern: ${detectOverloadPattern(body, message)}` }
+    return { action: ErrorAction.Overload, retryAfterMs: retryAfterMs ?? 2000, reason: `Server overload — pattern: ${detectOverloadPattern(body, message)}` }
   }
 
   if (status === 429) {
@@ -70,6 +73,16 @@ function parseRetryAfter(headers: Record<string, string>): number | null {
     }
   }
   return null
+}
+
+function parseBodyRetryAfter(text: string): number | null {
+  const match = text.match(/\bin\s+(?:(\d+)\s*h(?:ours?)?)?\s*(?:(\d+)\s*m(?:in(?:utes?)?)?)?\s*(?:(\d+)\s*s(?:ec(?:onds?)?)?)?\b/i)
+  if (!match) return null
+  const h = parseInt(match[1] || "0", 10)
+  const m = parseInt(match[2] || "0", 10)
+  const s = parseInt(match[3] || "0", 10)
+  if (h === 0 && m === 0 && s === 0) return null
+  return (h * 3600 + m * 60 + s) * 1000
 }
 
 function hasOverloadPattern(body: string, message: string): boolean {

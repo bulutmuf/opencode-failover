@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/Bun-1.0+-FBF0DF?style=flat-square&logo=bun" alt="Bun">
   <img src="https://img.shields.io/badge/OpenCode-1.17+-FF6B35?style=flat-square" alt="OpenCode">
   <a href="https://github.com/bulutmuf/opencode-failover/issues"><img src="https://img.shields.io/github/issues/bulutmuf/opencode-failover?style=flat-square" alt="Issues"></a>
-  <img src="https://img.shields.io/badge/Test-40-orange?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/Test-39-orange?style=flat-square" alt="Tests">
 </p>
 
 <p align="center">
@@ -37,7 +37,7 @@ Set your API keys. Ask the LLM in the TUI (natural language):
 
 > Add these NVIDIA API keys for failover rotation: nvapi-xxx, nvapi-yyy, nvapi-zzz
 
-The plugin saves keys to `.env` and restarts opencode to activate.
+The plugin saves keys to `.env` and activates automatically.
 
 Or create `.env` manually:
 
@@ -195,21 +195,24 @@ export OPENCODE_FAILOVER_PROVIDERS='{
 ### Precedence
 
 1. `OPENCODE_FAILOVER_PROVIDERS` env (full JSON) overrides everything
-2. `<PROVIDER>_API_KEYS` env + `opencode.json` options (merged)
-3. `opencode.json` options only
+2. `OPENCODE_FAILOVER_KEYS` env (JSON key map) overrides individual env vars
+3. `<PROVIDER>_API_KEYS` env + `opencode.json` options (merged)
+4. `opencode.json` options only
 
 ## How It Works
 
 ```
-Request    -->  Plugin picks next key (weighted round-robin)
+Request    -->  Plugin intercepts via global fetch patch
+             -->  Identifies provider by existing Authorization header
+             -->  Picks next key (weighted round-robin)
              -->  Sets Authorization header
              -->  OpenCode makes LLM call
              -->  Success? Done.
-             -->  Error?   session.error event fires
-             -->  Plugin classifies error:
+             -->  Error?   Plugin classifies HTTP response:
                     429 / rate-limit  -->  Quarantine key (exponential backoff)
                     401 / 403 / 402  -->  Disable key permanently
                     5xx              -->  Quarantine key temporarily
+                    ResourceExhausted -->  Overload action (2s backoff)
              -->  Next request picks a different key
              -->  Quarantined keys auto-release when timer expires
 ```
@@ -223,6 +226,7 @@ Request    -->  Plugin picks next key (weighted round-robin)
 | [402](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402) | Disable | Billing error, permanent |
 | [5xx](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses) | Quarantine | Temporary, same backoff as 429 |
 | Rate-limit pattern | Quarantine | Detected in body/message text |
+| Overload pattern | Quarantine | 2s backoff (ResourceExhausted) |
 | Other | Ignore | No action taken |
 
 ### Quarantine schedule
@@ -245,6 +249,7 @@ These are tools the LLM can call. Say them in natural language:
 | `keychain-setup` | "Add these API keys for nvidia: key1, key2" | Save API keys for a provider to `.env` (appends to existing) |
 | `keychain-remove` | "Remove all nvidia API keys" or "Remove key1 from nvidia" | Remove all or specific API keys for a provider from `.env` |
 | `keychain-status` | "Show me the keychain status" | Show all configured keys, their status, weights, and retry timers |
+| `keychain-reset` | "Reset the keychain" | Reset all quarantined keys back to active state immediately |
 
 Example output:
 
@@ -258,19 +263,11 @@ Example output:
 
 ## TUI Dashboard
 
-Type `/keychain` in the prompt (or `/failover`, `/opencode-failover`) to open the keychain dashboard:
+Type `/keychain` in the prompt (or `/failover`, `/opencode-failover`) to open the keychain dashboard.
 
-```
-Keychain
-─────────
-NVIDIA NIM (3 keys: 2 active, 1 quarantined, 0 disabled)
-  nvapi...abc (1x) [OK]
-  nvapi...def (1x) [120s]
-  nvapi...ghi (1x) [OK]
-  [native key backed up]
-```
+The dashboard displays live key counts and allows you to instantly search and select models from all your configured providers, automatically switching the current session.
 
-Shows all configured providers with masked keys, live status, and native key backup state. The dashboard is read-only — use LLM tools (`keychain-setup`/`keychain-remove`) to manage keys.
+The dashboard is read-only — use LLM tools (`keychain-setup`/`keychain-remove`) to manage keys.
 
 The TUI plugin auto-registers on first start. A `~/.config/opencode/tui.json` backup is created before any changes.
 
@@ -278,13 +275,16 @@ The TUI plugin auto-registers on first start. A `~/.config/opencode/tui.json` ba
 
 Works with any provider that uses API key authentication:
 
-| Provider | Env var | Default scheme |
-|----------|---------|----------------|
-| [NVIDIA NIM](https://build.nvidia.com) | `NVIDIA_API_KEYS` | Bearer |
-| [OpenRouter](https://openrouter.ai) | `OPENROUTER_API_KEYS` | Bearer |
-| [Anthropic](https://console.anthropic.com) | `ANTHROPIC_API_KEYS` | Bearer |
-| [OpenAI](https://platform.openai.com) | `OPENAI_API_KEYS` | Bearer |
-| Any custom | `<PROVIDER>_API_KEYS` | Bearer |
+| Provider | Env var | Default scheme | Aliases |
+|----------|---------|----------------|---------|
+| [NVIDIA NIM](https://build.nvidia.com) | `NVIDIA_API_KEYS` | Bearer | `nim` |
+| [OpenRouter](https://openrouter.ai) | `OPENROUTER_API_KEYS` | Bearer | |
+| [Anthropic](https://console.anthropic.com) | `ANTHROPIC_API_KEYS` | Bearer | |
+| [OpenAI](https://platform.openai.com) | `OPENAI_API_KEYS` | Bearer | |
+| Cloudflare Workers AI | `CLOUDFLARE_WORKERS_AI_API_KEYS` | Bearer | `cf`, `cloudflare` |
+| Any custom | `<PROVIDER>_API_KEYS` | Bearer | |
+
+> **Note**: For Cloudflare Workers AI, you must provide your Account ID as well: `Add this cloudflare key: xxx with account_id: yyy`.
 
 The provider ID must match the `providerID` used in your [OpenCode model configuration](https://opencode.ai/docs/config).
 
@@ -313,14 +313,16 @@ src/
   config.ts         Env + options parser
   state.ts          KeyPool: rotation, quarantine, backoff
   classify.ts       Error classifier: status/body -> action
-  auth.ts           Native key backup/restore from auth.json
+  lib/
+    auth.ts         Native key backup/restore from auth.json
+    fetch-patch.ts  Global fetch monkey-patch interceptor
   shared.ts         Masked state file (~/.opencode/failover-state.json)
   version-check.ts  npm registry poll for new versions
   tui.tsx           TUI dashboard: /keychain slash command
-  state.test.ts     7 tests for rotation and quarantine
-  classify.test.ts  14 tests for error classification
-  config.test.ts    7 tests for env provider discovery
-  auth.test.ts      12 tests for auth.json operations
+  state.test.ts     7 tests
+  classify.test.ts  19 tests
+  config.test.ts    7 tests
+  auth.test.ts      6 tests
 documents/
   00-architecture.md
   01-error-patterns.md

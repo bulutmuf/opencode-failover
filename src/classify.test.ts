@@ -113,6 +113,22 @@ describe("classify", () => {
     expect(result.retryAfterMs).toBeLessThanOrEqual(6000)
   })
 
+  it("parses duration from body message like 'in 4h 26m'", () => {
+    const result = classify({
+      data: { message: "All 1 account(s) rate-limited for claude. Quota resets in 4h 26m." },
+    })
+    expect(result.action).toBe(ErrorAction.Overload) // matched "quota"
+    expect(result.retryAfterMs).toBe((4 * 3600 + 26 * 60) * 1000)
+  })
+
+  it("parses duration from body message like 'resets in 45s'", () => {
+    const result = classify({
+      data: { message: "Rate limit exceeded. Try again in 45s." },
+    })
+    expect(result.action).toBe(ErrorAction.Rotate)
+    expect(result.retryAfterMs).toBe(45000)
+  })
+
   it("detects rate limit in message string", () => {
     const result = classify({
       data: { message: "Too many requests. Please slow down." },
