@@ -65,6 +65,37 @@ describe("KeyPool", () => {
     expect(["key-a", "key-b"]).toContain(picked)
   })
 
+  it("does not reactivate disabled keys when all keys are disabled", () => {
+    const pool = new KeyPool()
+    pool.register("test", {
+      keys: ["key-a", "key-b"],
+      header: "Authorization",
+      scheme: "Bearer",
+    })
+
+    pool.disable("test", "key-a", "401")
+    pool.disable("test", "key-b", "403")
+
+    expect(() => pool.pick("test")).toThrow('No active keys available for provider "test"')
+    expect(pool.status("test").map((k) => k.status)).toEqual(["disabled", "disabled"])
+  })
+
+  it("uses quarantined keys before disabled keys when no active keys remain", () => {
+    const pool = new KeyPool()
+    pool.register("test", {
+      keys: ["key-a", "key-b", "key-c"],
+      header: "Authorization",
+      scheme: "Bearer",
+    })
+
+    pool.disable("test", "key-a", "401")
+    pool.quarantine("test", "key-b", null, "429")
+    pool.quarantine("test", "key-c", null, "429")
+
+    expect(["key-b", "key-c"]).toContain(pool.pick("test"))
+    expect(pool.status("test").find((k) => k.key === "key-a")!.status).toBe("disabled")
+  })
+
   it("unquarantees keys after retryAfterMs expires", async () => {
     const pool = new KeyPool()
     pool.register("test", {
@@ -80,6 +111,22 @@ describe("KeyPool", () => {
 
     const picked = pool.pick("test")
     expect(pool.status("test").filter((k) => k.status === "active").length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("uses retryAfterMs as the quarantine duration", () => {
+    const pool = new KeyPool()
+    pool.register("test", {
+      keys: ["key-a", "key-b"],
+      header: "Authorization",
+      scheme: "Bearer",
+    })
+
+    const before = Date.now()
+    pool.quarantine("test", "key-a", 2_500, "429 retry-after")
+    const until = pool.status("test").find((k) => k.key === "key-a")!.quarantinedUntil
+
+    expect(until - before).toBeGreaterThanOrEqual(2_500)
+    expect(until - before).toBeLessThan(5_000)
   })
 
   it("exponential backoff on repeat quarantine", () => {
