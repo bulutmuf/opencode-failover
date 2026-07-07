@@ -38,35 +38,11 @@ function readSharedState(): SharedState | null {
   catch { return null }
 }
 
-async function switchToModel(api: any, providerID: string, modelID: string, label: string) {
-  try {
-    const current = api.route.current
-    let sessionID = ""
-
-    if (current.name === "session") {
-      sessionID = current.params.sessionID
-    }
-
-    if (!sessionID) {
-      try {
-        const active: any = await api.client.v2.session.active({})
-        sessionID = active?.data?.[0]?.id ?? ""
-      } catch {}
-    }
-
-    if (!sessionID) {
-      api.ui.toast({ message: "opencode-failover: No active session found.", variant: "warning", duration: 5000 })
-      return
-    }
-
-    await api.client.v2.session.switchModel({
-      sessionID,
-      model: { id: modelID, providerID },
-    })
-    api.ui.toast({ message: `opencode-failover: Switched to ${label}`, variant: "success", duration: 3000 })
-  } catch (e) {
-    api.ui.toast({ message: `opencode-failover: switchModel failed: ${String(e)}`, variant: "error", duration: 5000 })
-  }
+function feedKeystrokes(api: any, text: string, delay: number): void {
+  setTimeout(() => {
+    const stdin = (api.renderer as unknown as { stdin?: { emit: (e: string, d: unknown) => unknown } }).stdin
+    stdin?.emit("data", Buffer.from(text))
+  }, delay)
 }
 
 const tui: TuiPlugin = async (api) => {
@@ -129,9 +105,16 @@ const tui: TuiPlugin = async (api) => {
       placeholder: "Search models...",
       options,
       onSelect(opt: { value: { providerID: string; modelID: string; label: string; providerName: string } }) {
-        const { providerID, modelID, label } = opt.value
+        const { label, providerName } = opt.value
         api.ui.dialog.clear()
-        void switchToModel(api, providerID, modelID, label)
+
+        setTimeout(() => {
+          api.keymap.dispatchCommand("model.list")
+          feedKeystrokes(api, providerName, 150)
+          feedKeystrokes(api, ` ${label}`, 300)
+          feedKeystrokes(api, "\r", 450)
+          feedKeystrokes(api, "\x1b", 530)
+        }, 50)
       },
     }))
   }
