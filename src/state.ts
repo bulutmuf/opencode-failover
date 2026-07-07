@@ -156,6 +156,19 @@ export class KeyPool {
     return [...this.pool(providerID)]
   }
 
+  resetAll(providerID: string): void {
+    const pool = this.pools.get(providerID)
+    if (!pool) return
+    for (const k of pool) {
+      k.status = "active"
+      k.consecutiveErrors = 0
+      k.quarantinedUntil = 0
+      k.retryAfterMs = null
+      k.lastErrorMessage = ""
+    }
+    this.serialize()
+  }
+
   allProviderIDs(): string[] {
     return Array.from(this.pools.keys())
   }

@@ -29,6 +29,10 @@ export function classify(raw: unknown): ClassifierResult {
 
   const retryAfterMs = parseRetryAfter(headers as Record<string, string>)
 
+  if (hasOverloadPattern(body, message)) {
+    return { action: ErrorAction.Overload, retryAfterMs: 2000, reason: `Server overload — pattern: ${detectOverloadPattern(body, message)}` }
+  }
+
   if (status === 429) {
     return { action: ErrorAction.Rotate, retryAfterMs, reason: `Rate limited — HTTP 429` }
   }
@@ -40,10 +44,6 @@ export function classify(raw: unknown): ClassifierResult {
 
   if (status >= 500 && status < 600) {
     return { action: ErrorAction.Rotate, retryAfterMs: null, reason: `Server error — HTTP ${status}` }
-  }
-
-  if (hasOverloadPattern(body, message)) {
-    return { action: ErrorAction.Overload, retryAfterMs: 2000, reason: `Server overload — pattern: ${detectOverloadPattern(body, message)}` }
   }
 
   if (hasRateLimitPattern(body, message)) {
