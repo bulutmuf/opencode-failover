@@ -3,9 +3,11 @@ import { discoverEnvProviders, providerIDs } from "./config.ts"
 
 describe("discoverEnvProviders", () => {
   beforeEach(() => {
-    delete Bun.env["NVIDIA_API_KEYS"]
-    delete Bun.env["OPENROUTER_API_KEYS"]
-    delete Bun.env["OPENCODE_FAILOVER_PROVIDERS"]
+    Object.keys(Bun.env).forEach((k) => {
+      if (k.endsWith("_API_KEYS") || k === "OPENCODE_FAILOVER_PROVIDERS" || k === "OPENCODE_FAILOVER_KEYS") {
+        delete Bun.env[k]
+      }
+    })
   })
 
   it("discovers providers from <ID>_API_KEYS env vars", () => {

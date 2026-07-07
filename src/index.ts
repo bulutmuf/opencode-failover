@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
-import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey, KEYCHAIN_JSON_KEY, readKeychainJson, writeKeychainJson, migrateLegacyKeys } from "./config.ts"
+import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey, KEYCHAIN_JSON_KEY, readKeychainJson, writeKeychainJson, migrateLegacyKeys, importFromAuthJson } from "./config.ts"
 import { KeyPool } from "./state.ts"
 import { writeAuthKey, removeAuthKey } from "./lib/auth.ts"
 import { installFetchPatch, uninstallFetchPatch, registerProvider } from "./lib/fetch-patch.ts"
@@ -128,6 +128,15 @@ export const server = async function(input: any, opts?: unknown) {
       const envPath = envFilePath(input.directory)
       trace(`config hook fired | envPath=${envPath}`)
       await migrateLegacyKeys(envPath)
+      const imported = await importFromAuthJson(envPath)
+      for (const [id, { keys, metadata }] of imported) {
+        if (!pool.allProviderIDs().includes(id)) {
+          const config = { keys: keys, header: "Authorization", scheme: "Bearer" }
+          pool.register(id, config)
+          registerProvider(id, { header: "Authorization", scheme: "Bearer" })
+        }
+        if (keys[0]) trackAuthKey(id, keys[0], metadata)
+      }
       const envVars = readEnvFile(envPath)
       for (const [key, value] of envVars) {
         if (!Bun.env[key]) Bun.env[key] = value
@@ -192,13 +201,17 @@ export const server = async function(input: any, opts?: unknown) {
         args: {
           provider: tool.schema.string().describe("Provider name, e.g. nvidia, openrouter, cloudflare"),
           keys: tool.schema.string().describe("Comma-separated API keys, e.g. nvapi-xxx,nvapi-yyy"),
-          account_id: tool.schema.string().optional().describe("Cloudflare Workers AI account ID (optional, only needed for cloudflare/cloudflare-workers-ai)"),
+          account_id: tool.schema.string().optional().describe("Cloudflare Workers AI account ID (required for cloudflare/cloudflare-workers-ai)"),
         },
         async execute({ provider, keys, account_id }: { provider: string; keys: string; account_id?: string }) {
           const envPath = envFilePath(input.directory)
           const resolved = resolveProvider(provider)
           const newKeys = keys.split(",").map((k) => k.trim()).filter(Boolean)
           if (newKeys.length === 0) return "opencode-failover: No valid keys provided."
+
+          if (resolved === "cloudflare-workers-ai" && !account_id) {
+            return "opencode-failover: Cloudflare Workers AI requires account_id. Provide account_id parameter with your Cloudflare Account ID."
+          }
 
           const envVars = readEnvFile(envPath)
           const json = readKeychainJson(envVars)
@@ -214,12 +227,6 @@ export const server = async function(input: any, opts?: unknown) {
 
           const metadata = account_id ? { account_id } : undefined
           trackAuthKey(resolved, merged[0]!, metadata)
-
-          pool.register(resolved, { keys: merged, header: "Authorization", scheme: "Bearer" })
-          registerProvider(resolved, { header: "Authorization", scheme: "Bearer" })
-          log(input, `saved ${newKeys.length} key(s) for ${resolved}`)
-          safeToast(input, `Saved ${newKeys.length} key(s) for ${displayName(resolved)}.`, "success")
-          return `Saved ${newKeys.length} key(s) for ${displayName(resolved)}. Total: ${merged.length} in ${envPath}.`
         },
       }),
 

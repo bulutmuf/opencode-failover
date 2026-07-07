@@ -2,6 +2,7 @@ import { z } from "zod"
 import { existsSync, readFileSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
 import path from "node:path"
+import { readAuth } from "./lib/auth.ts"
 
 const ProviderConfigSchema = z.object({
   keys: z.array(z.string().min(1)).min(1),
@@ -144,6 +145,39 @@ export async function migrateLegacyKeys(filePath: string): Promise<Map<string, s
     await writeKeychainJson(filePath, new Map([...json, ...legacy]))
   }
   return new Map([...json, ...legacy])
+}
+
+export async function migrateLegacyKeys(filePath: string): Promise<Map<string, string[]>> {
+  const envVars = readEnvFile(filePath)
+  const json = readKeychainJson(envVars)
+  const legacy = new Map<string, string[]>()
+  for (const [key, value] of envVars) {
+    if (!key.endsWith("_API_KEYS")) continue
+    if (key === PROVIDERS_ENV_KEY || key === KEYCHAIN_JSON_KEY) continue
+    const id = key.slice(0, -"_API_KEYS".length).toLowerCase()
+    const keys = value.split(",").map((k) => k.trim()).filter(Boolean)
+    if (keys.length > 0 && !json.has(id)) legacy.set(id, keys)
+  }
+  if (legacy.size > 0) {
+    await writeKeychainJson(filePath, new Map([...json, ...legacy]))
+  }
+  return new Map([...json, ...legacy])
+}
+
+export async function importFromAuthJson(filePath: string): Promise<Map<string, { keys: string[], metadata?: Record<string, string> }>> {
+  const auth = readAuth()
+
+  const result = new Map<string, { keys: string[], metadata?: Record<string, string> }>()
+  for (const [id, entry] of Object.entries(auth)) {
+    if (entry?.type !== "api" || !entry?.key) continue
+    if (entry.key && !result.has(id)) {
+      const metadata: Record<string, string> = {}
+      if (entry.metadata?.account_id) metadata.account_id = entry.metadata.account_id
+      if (entry.metadata?.accountId) metadata.account_id = entry.metadata.accountId
+      result.set(id, { keys: [entry.key], metadata: Object.keys(metadata).length ? metadata : undefined })
+    }
+  }
+  return result
 }
 
 export function providerIDs(opts?: unknown): string[] {
