@@ -149,6 +149,14 @@ export function installFetchPatch(input: any, pool: KeyPool): void {
 
       if (result.action === ErrorAction.Rotate) {
         const delay = result.retryAfterMs || retryMs(res.headers)
+        if (delay < 10_000) {
+          const next = _pool.pick(providerID)
+          try { writeAuthKey(providerID, next) } catch {}
+          const nextMasked = next.length > 7 ? `${next.slice(0, 4)}...${next.slice(-3)}` : "<key>"
+          toast(`opencode-failover: [${providerID}] server overload. Switching to ${nextMasked} (2s backoff).`, "warning")
+          key = next
+          continue
+        }
         _pool.quarantine(providerID, key, delay, result.reason)
         const next = _pool.pick(providerID)
         try { writeAuthKey(providerID, next) } catch {}

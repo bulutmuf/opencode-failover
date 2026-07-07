@@ -79,8 +79,11 @@ function hasOverloadPattern(body: string, message: string): boolean {
 function detectOverloadPattern(body: string, message: string): string | null {
   const lower = body.toLowerCase() + message.toLowerCase()
   const patterns = [
+    "resourcexhausted",
     "resource exhausted",
     "resource_exhausted",
+    "res_exhausted",
+    "res exhausted",
     "exhausted",
     "worker local total request limit",
     "server is overloaded",
