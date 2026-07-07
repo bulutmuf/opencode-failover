@@ -17,6 +17,12 @@ type Options = Record<string, ProviderConfig>
 const PROVIDERS_ENV_KEY = "OPENCODE_FAILOVER_PROVIDERS"
 export const KEYCHAIN_JSON_KEY = "OPENCODE_FAILOVER_KEYS"
 
+function envMap(): Map<string, string> {
+  return new Map(
+    Object.entries(Bun.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  )
+}
+
 export function parseEnvProviders(): Map<string, ProviderConfig> {
   const raw = Bun.env[PROVIDERS_ENV_KEY]
   if (!raw) return new Map()
@@ -35,7 +41,7 @@ export function parseEnvProviders(): Map<string, ProviderConfig> {
 }
 
 export function parseEnvKeys(id: string): string[] | null {
-  const json = readKeychainJson(new Map(Object.entries(Bun.env)))
+  const json = readKeychainJson(envMap())
   const fromJson = json.get(id)
   if (fromJson) return fromJson
 
@@ -83,7 +89,7 @@ export function loadProviderConfig(
 export function discoverEnvProviders(): Map<string, ProviderConfig> {
   const result = new Map<string, ProviderConfig>()
 
-  const envVars = new Map(Object.entries(Bun.env))
+  const envVars = envMap()
   for (const [id, keys] of readKeychainJson(envVars)) {
     if (keys.length === 0) continue
     result.set(id, { keys, header: "Authorization", scheme: "Bearer" })

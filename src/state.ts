@@ -110,9 +110,12 @@ export class KeyPool {
       k.consecutiveErrors = 0
       if (k.quarantinedUntil === 0) k.quarantinedUntil = now
     }
-    const active = pool.filter((k) => k.status === "active")
+    const available = pool.filter((k) => k.status !== "disabled")
+    const active = available.filter((k) => k.status === "active")
     if (active.length === 0) {
-      const earliest = pool.reduce((best, curr) => curr.quarantinedUntil < best.quarantinedUntil ? curr : best)
+      const quarantined = available.filter((k) => k.status === "quarantined")
+      if (quarantined.length === 0) throw new Error(`No active keys available for provider "${providerID}"`)
+      const earliest = quarantined.reduce((best, curr) => curr.quarantinedUntil < best.quarantinedUntil ? curr : best)
       earliest.status = "active"
       earliest.consecutiveErrors = 0
       active.push(earliest)
@@ -135,7 +138,8 @@ export class KeyPool {
     const base = QUARANTINE_BASE_MS
     const factor = Math.min(entry.consecutiveErrors - 1, 4)
     const exp = QUARANTINE_CAP_MS
-    const quarantineMs = Math.min(base * Math.pow(2, factor), exp)
+    const fallbackMs = Math.min(base * Math.pow(2, factor), exp)
+    const quarantineMs = retryAfterMs && retryAfterMs > 0 ? retryAfterMs : fallbackMs
     entry.quarantinedUntil = Date.now() + quarantineMs
     entry.lastErrorAt = Date.now()
     entry.lastErrorMessage = reason
