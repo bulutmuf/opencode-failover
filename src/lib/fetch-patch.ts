@@ -130,6 +130,15 @@ export function installFetchPatch(input: any, pool: KeyPool): void {
 
       const masked = key.length > 7 ? `${key.slice(0, 4)}...${key.slice(-3)}` : "<key>"
 
+      if (result.action === ErrorAction.Overload) {
+        const next = _pool.pick(providerID)
+        try { writeAuthKey(providerID, next) } catch {}
+        const nextMasked = next.length > 7 ? `${next.slice(0, 4)}...${next.slice(-3)}` : "<key>"
+        toast(`opencode-failover: [${providerID}] server overload. Switching to ${nextMasked} (2s backoff).`, "warning")
+        key = next
+        continue
+      }
+
       if (result.action === ErrorAction.Disable) {
         _pool.disable(providerID, key, result.reason)
         key = _pool.pick(providerID)
