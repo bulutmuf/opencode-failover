@@ -110,10 +110,9 @@ const tui: TuiPlugin = async (api) => {
 
         setTimeout(() => {
           api.keymap.dispatchCommand("model.list")
-          feedKeystrokes(api, providerName, 150)
-          feedKeystrokes(api, ` ${label}`, 300)
-          feedKeystrokes(api, "\r", 450)
-          feedKeystrokes(api, "\x1b", 530)
+          feedKeystrokes(api, providerName, 200)
+          feedKeystrokes(api, ` ${label}`, 500)
+          feedKeystrokes(api, "\r", 800)
         }, 50)
       },
     }))
