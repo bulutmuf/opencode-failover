@@ -47,6 +47,19 @@ function feedKeystrokes(api: any, text: string, delay: number): void {
 
 const tui: TuiPlugin = async (api) => {
 
+  let cachedProviderData: Array<any> | null = null
+
+  async function fetchProviderData(): Promise<Array<any>> {
+    try {
+      const res = await api.client.provider.list({})
+      return ((res as any).data?.all) ?? [...api.state.provider]
+    } catch {
+      return [...api.state.provider]
+    }
+  }
+
+  void fetchProviderData().then((data) => { cachedProviderData = data })
+
   async function openDashboard() {
     const keychain = readSharedState()
     const keychainIds = new Set((keychain?.providers ?? []).map((p) => p.id))
@@ -60,13 +73,17 @@ const tui: TuiPlugin = async (api) => {
     }
 
     let providerData: Array<{ id: string; models: Record<string, { name?: string }> }> = []
-    try {
-      const res = await api.client.provider.list({})
-      const resp = res as { data?: { all?: unknown[] } }
-      providerData = (resp.data?.all as typeof providerData) ?? []
-    } catch (e) {
-      api.ui.toast({ variant: "error", message: `opencode-failover: provider.list() failed: ${String(e)}`, duration: 8000 })
-      providerData = [...api.state.provider] as typeof providerData
+    if (cachedProviderData) {
+      providerData = cachedProviderData as typeof providerData
+    } else {
+      try {
+        const res = await api.client.provider.list({})
+        const resp = res as { data?: { all?: unknown[] } }
+        providerData = (resp.data?.all as typeof providerData) ?? []
+      } catch (e) {
+        providerData = [...api.state.provider] as typeof providerData
+      }
+      cachedProviderData = providerData
     }
     const options: Array<{ title: string; value: unknown; description: string; category: string }> = []
 
