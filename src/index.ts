@@ -127,24 +127,27 @@ export const server = async function(input: any, opts?: unknown) {
     config: async () => {
       const envPath = envFilePath(input.directory)
       trace(`config hook fired | envPath=${envPath}`)
-      await migrateLegacyKeys(envPath)
+      try { await migrateLegacyKeys(envPath) } catch (e) { trace(`migrateLegacyKeys failed: ${e}`) }
       
-      const imported = await importFromAuthJson(envPath)
-      if (imported.size > 0) {
-        let changed = false
-        const currentJson = readKeychainJson(envPath)
-        for (const [id, { keys, metadata }] of imported) {
-          if (!currentJson[id]) {
-            currentJson[id] = { keys, metadata }
-            changed = true
+      try {
+        const imported = await importFromAuthJson(envPath)
+        if (imported.size > 0) {
+          let changed = false
+          const envVarsInitial = readEnvFile(envPath)
+          const currentJson = readKeychainJson(envVarsInitial)
+          for (const [id, { keys, metadata }] of imported) {
+            if (!currentJson.has(id)) {
+              currentJson.set(id, keys)
+              changed = true
+            }
+          }
+          if (changed) {
+            await writeKeychainJson(envPath, currentJson)
+            Bun.env[KEYCHAIN_JSON_KEY] = JSON.stringify(Object.fromEntries(currentJson))
+            trace(`config: imported native auth keys to keychain JSON`)
           }
         }
-        if (changed) {
-          await writeKeychainJson(envPath, currentJson)
-          Bun.env[KEYCHAIN_JSON_KEY] = JSON.stringify(currentJson)
-          trace(`config: imported native auth keys to keychain JSON`)
-        }
-      }
+      } catch (e) { trace(`importFromAuthJson failed: ${e}`) }
 
       const envVars = readEnvFile(envPath)
       for (const [key, value] of envVars) {

@@ -1,6 +1,6 @@
 {
   "name": "opencode-failover",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "OpenCode plugin for automatic API-key failover and rotation across multiple provider keys",
   "type": "module",
   "license": "MIT",

@@ -53,7 +53,12 @@ function matchPoolKey(authValue: string): { providerID: string; key: string; met
   for (const [providerID, meta] of providers) {
     const keys = _pool.status(providerID)
     for (const k of keys) {
-      if (authValue.includes(k.key)) return { providerID, key: k.key, meta }
+      if (authValue === k.key || authValue.endsWith(" " + k.key) || authValue.endsWith("=" + k.key)) {
+        return { providerID, key: k.key, meta }
+      }
+      if (k.key.length > 10 && authValue.includes(k.key)) {
+        return { providerID, key: k.key, meta }
+      }
     }
   }
   return null

@@ -191,6 +191,29 @@ OPENAI_API_KEYS="sk-xxx,sk-yyy"
 }
 ```
 
+## Cloudflare Workers AI
+
+Cloudflare requires your ccount_id as metadata in addition to the API key.
+
+### Configuration
+
+You can use the JSON OPENCODE_FAILOVER_PROVIDERS var:
+
+`ash
+export OPENCODE_FAILOVER_PROVIDERS='{
+  "cloudflare": {
+    "keys": [
+      { "key": "cf-key-1", "meta": { "account_id": "acc-1" } },
+      { "key": "cf-key-2", "meta": { "account_id": "acc-2" } }
+    ]
+  }
+}'
+`
+
+Or you can use the LLM tool directly in the TUI:
+
+> Add this cloudflare key: xxx with account_id: yyy
+
 ## Custom / self-hosted
 
 Any OpenAI-compatible provider (vLLM, llama.cpp, Ollama, LiteLLM, etc.).
@@ -278,3 +301,4 @@ Active: [fast, medium, slow]
 Slots: [fast, fast, fast, medium, slow]
 Rotation: fast → fast → fast → medium → slow → ...
 ```
+
