@@ -9,15 +9,8 @@ function authFilePath(): string {
   if (xdgData) {
     return path.join(xdgData, "opencode", "auth.json")
   }
-  const localAppData = Bun.env.LOCALAPPDATA ?? process.env.LOCALAPPDATA
-  if (localAppData) {
-    const p = path.join(localAppData, "opencode", "auth.json")
-    if (existsSync(p)) return p
-  }
   const base = Bun.env.HOME ?? Bun.env.USERPROFILE ?? process.env.HOME ?? process.env.USERPROFILE ?? ""
-  const primary = path.join(base, ".local", "share", "opencode", "auth.json")
-  if (existsSync(primary)) return primary
-  return path.join(base, ".opencode", "auth.json")
+  return path.join(base, ".local", "share", "opencode", "auth.json")
 }
 
 function readAuth(): Record<string, { type: string; key: string }> {
