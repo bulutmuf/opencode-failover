@@ -1,6 +1,21 @@
+import { describe, it, expect, beforeAll, afterAll } from "bun:test"
+import { existsSync, mkdirSync, rmSync } from "node:fs"
+import path from "node:path"
 import { KeyPool } from "./state.ts"
 
+const TEST_DIR = "C:\\Users\\Burak\\AppData\\Local\\Temp\\opencode_state_test"
+
 describe("KeyPool", () => {
+  beforeAll(() => {
+    Bun.env.OPENCODE_FAILOVER_TEST_DIR = TEST_DIR
+    if (!existsSync(TEST_DIR)) mkdirSync(TEST_DIR, { recursive: true })
+  })
+
+  afterAll(() => {
+    delete Bun.env.OPENCODE_FAILOVER_TEST_DIR
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true, force: true })
+  })
+
   it("rotates keys round-robin by weight", () => {
     const pool = new KeyPool()
     pool.register("test", {

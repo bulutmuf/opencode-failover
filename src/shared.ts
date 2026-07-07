@@ -26,6 +26,9 @@ export interface SharedState {
 }
 
 export function sharedStatePath(): string {
+  if (Bun.env.OPENCODE_FAILOVER_TEST_DIR) {
+    return path.join(Bun.env.OPENCODE_FAILOVER_TEST_DIR, "failover-state.json")
+  }
   const configDir = Bun.env.OPENCODE_CONFIG_DIR
     || path.join(os.homedir(), ".config", "opencode")
   return path.join(configDir, "failover-state.json")
