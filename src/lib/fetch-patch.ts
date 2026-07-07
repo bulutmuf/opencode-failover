@@ -13,6 +13,7 @@ let _original: typeof fetch | null = null
 let _pool: KeyPool | null = null
 let _input: any = null
 let _installed = false
+type FetchArgs = Parameters<typeof fetch>
 
 function toast(message: string, variant: string) {
   try { _input?.client?.tui?.showToast({ body: { message, variant, duration: 6000 } }) } catch {}
@@ -35,7 +36,7 @@ function readHeaders(init?: RequestInit): Record<string, string> {
     init.headers.forEach((v, k) => { result[k.toLowerCase()] = v })
   } else if (Array.isArray(init.headers)) {
     for (const [k, v] of init.headers) {
-      if (k) result[k.toLowerCase()] = String(v)
+      if (k !== undefined) result[k.toLowerCase()] = String(v)
     }
   } else {
     for (const [k, v] of Object.entries(init.headers)) result[k.toLowerCase()] = String(v)
@@ -73,7 +74,7 @@ function applyAuth(init: RequestInit | undefined, meta: ProviderMeta, key: strin
       init.headers.forEach((v, k) => hdrs.set(k, v))
     } else if (Array.isArray(init.headers)) {
       for (const [k, v] of init.headers) {
-        if (k) hdrs.set(k, String(v))
+        if (k !== undefined) hdrs.set(k, String(v))
       }
     } else {
       for (const [k, v] of Object.entries(init.headers)) hdrs.set(k, String(v))
@@ -99,7 +100,7 @@ export function installFetchPatch(input: any, pool: KeyPool): void {
   _input = input
   _original = globalThis.fetch.bind(globalThis)
 
-  globalThis.fetch = (async (req: string | Request | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (req: FetchArgs[0], init?: FetchArgs[1]) => {
     if (!_original || !_pool) return _original!(req, init)
 
     const hdrs = readHeaders(init)
