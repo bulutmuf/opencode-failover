@@ -105,7 +105,20 @@ export function installFetchPatch(input: any, pool: KeyPool): void {
       const newInit = applyAuth(init, meta, key)
       const res = await _original(req, newInit)
 
-      if (!RETRYABLE.has(res.status)) return res
+      if (!RETRYABLE.has(res.status)) {
+        let body = ""
+        try { body = await res.clone().text() } catch {}
+        const result = classify({ statusCode: res.status, responseBody: body, message: body.slice(0, 200) })
+        if (result.action !== ErrorAction.Overload) return res
+        if (attempt >= MAX_RETRIES - 1) return res
+
+        const next = _pool.pick(providerID)
+        try { writeAuthKey(providerID, next) } catch {}
+        const nextMasked = next.length > 7 ? `${next.slice(0, 4)}...${next.slice(-3)}` : "<key>"
+        toast(`opencode-failover: [${providerID}] server overload. Switching to ${nextMasked} (2s backoff).`, "warning")
+        key = next
+        continue
+      }
       if (attempt >= MAX_RETRIES - 1) return res
 
       let body = ""

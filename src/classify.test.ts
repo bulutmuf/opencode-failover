@@ -52,11 +52,33 @@ describe("classify", () => {
     expect(result.action).toBe(ErrorAction.Rotate)
   })
 
-  it("detects rate limit text in response body", () => {
+  it("detects overload pattern in response body", () => {
     const result = classify({
       data: { responseBody: JSON.stringify({ error: { code: "context_length_exhausted" } }) },
     })
-    expect(result.action).toBe(ErrorAction.Rotate)
+    expect(result.action).toBe(ErrorAction.Overload)
+  })
+
+  it("detects ResourceExhausted server overload", () => {
+    const result = classify({
+      data: { message: "ResourceExhausted: Worker local total request limit reached (581/48)" },
+    })
+    expect(result.action).toBe(ErrorAction.Overload)
+    expect(result.retryAfterMs).toBe(2000)
+  })
+
+  it("detects server is overloaded", () => {
+    const result = classify({
+      data: { responseBody: "Server is overloaded. Try again later." },
+    })
+    expect(result.action).toBe(ErrorAction.Overload)
+  })
+
+  it("detects service unavailable as overload", () => {
+    const result = classify({
+      data: { message: "Service unavailable due to high demand" },
+    })
+    expect(result.action).toBe(ErrorAction.Overload)
   })
 
   it("detects Anthropic too_many_requests JSON", () => {
