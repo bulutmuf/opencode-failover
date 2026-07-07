@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
-import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
+import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey, KEYCHAIN_JSON_KEY, readKeychainJson, writeKeychainJson, migrateLegacyKeys } from "./config.ts"
 import { KeyPool } from "./state.ts"
 import { writeAuthKey, removeAuthKey } from "./lib/auth.ts"
 import { installFetchPatch, uninstallFetchPatch, registerProvider } from "./lib/fetch-patch.ts"
@@ -95,6 +95,7 @@ export const server = async function(input: any, opts?: unknown) {
     config: async () => {
       const envPath = envFilePath(input.directory)
       trace(`config hook fired | envPath=${envPath}`)
+      await migrateLegacyKeys(envPath)
       const envVars = readEnvFile(envPath)
       for (const [key, value] of envVars) {
         if (!Bun.env[key]) Bun.env[key] = value
@@ -162,14 +163,21 @@ export const server = async function(input: any, opts?: unknown) {
         },
         async execute({ provider, keys }: { provider: string; keys: string }) {
           const envPath = envFilePath(input.directory)
-          const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
           const newKeys = keys.split(",").map((k) => k.trim()).filter(Boolean)
           if (newKeys.length === 0) return "opencode-failover: No valid keys provided."
-          const existingRaw = Bun.env[envKey]
-          const existingKeys = existingRaw ? existingRaw.split(",").map((k) => k.trim()).filter(Boolean) : []
-          const merged = [...new Set([...existingKeys, ...newKeys])]
+
+          const envVars = readEnvFile(envPath)
+          const json = readKeychainJson(envVars)
+          const existingJson = json.get(provider) ?? []
+          const merged = [...new Set([...existingJson, ...newKeys])]
+          json.set(provider, merged)
+          await writeKeychainJson(envPath, json)
+
+          const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
           await writeEnvKey(envPath, envKey, merged.join(","))
           Bun.env[envKey] = merged.join(",")
+          Bun.env[KEYCHAIN_JSON_KEY] = JSON.stringify(Object.fromEntries(json))
+
           pool.register(provider, { keys: merged, header: "Authorization", scheme: "Bearer" })
           registerProvider(provider, { header: "Authorization", scheme: "Bearer" })
           trackAuthKey(provider, merged[0]!)
@@ -187,30 +195,36 @@ export const server = async function(input: any, opts?: unknown) {
         },
         async execute({ provider, key }: { provider: string; key?: string }) {
           const envPath = envFilePath(input.directory)
-          const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
-          const existingRaw = Bun.env[envKey]
-          const existingKeys = existingRaw ? existingRaw.split(",").map((k) => k.trim()).filter(Boolean) : []
+          const envVars = readEnvFile(envPath)
+          const json = readKeychainJson(envVars)
+          const existingKeys = json.get(provider) ?? []
           if (existingKeys.length === 0) return `No keys found for ${displayName(provider)}.`
           if (key) {
             const toRemove = key.split(",").map((k) => k.trim()).filter(Boolean)
             const remaining = existingKeys.filter((k) => !toRemove.includes(k))
             if (remaining.length === existingKeys.length) return `Specified key(s) not found.`
             if (remaining.length === 0) {
-              await removeEnvKey(envPath, envKey)
-              delete Bun.env[envKey]
+              json.delete(provider)
               clearAuthKey(provider)
             } else {
-              await writeEnvKey(envPath, envKey, remaining.join(","))
-              Bun.env[envKey] = remaining.join(",")
+              json.set(provider, remaining)
               trackAuthKey(provider, remaining[0]!)
             }
+            await writeKeychainJson(envPath, json)
+            const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
+            Bun.env[envKey] = remaining.join(",")
+            Bun.env[KEYCHAIN_JSON_KEY] = json.size > 0 ? JSON.stringify(Object.fromEntries(json)) : ""
             pool.register(provider, { keys: remaining, header: "Authorization", scheme: "Bearer" })
             registerProvider(provider, { header: "Authorization", scheme: "Bearer" })
             safeToast(input, `Removed ${existingKeys.length - remaining.length} key(s).`, "success")
             return `Removed ${existingKeys.length - remaining.length} key(s).`
           }
+          json.delete(provider)
+          await writeKeychainJson(envPath, json)
+          const envKey = `${provider.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()}_API_KEYS`
           await removeEnvKey(envPath, envKey)
           delete Bun.env[envKey]
+          Bun.env[KEYCHAIN_JSON_KEY] = json.size > 0 ? JSON.stringify(Object.fromEntries(json)) : ""
           clearAuthKey(provider)
           safeToast(input, `Removed all keys from ${displayName(provider)}.`, "success")
           return `Removed all keys.`

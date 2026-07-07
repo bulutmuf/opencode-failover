@@ -74,6 +74,13 @@ const tui: TuiPlugin = async (api) => {
 
     let providerData: Array<{ id: string; models: Record<string, { name?: string }> }> = []
     if (cachedProviderData) {
+      const cachedIds = new Set(cachedProviderData.map((p: any) => p.id))
+      const missing = [...keychainIds].filter((id) => !cachedIds.has(id))
+      if (missing.length > 0) {
+        cachedProviderData = null
+      }
+    }
+    if (cachedProviderData) {
       providerData = cachedProviderData as typeof providerData
     } else {
       try {
