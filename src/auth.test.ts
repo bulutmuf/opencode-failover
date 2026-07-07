@@ -17,7 +17,7 @@ describe("auth.ts", () => {
     Bun.env.OPENCODE_CONFIG_DIR = TEST_DIR
     if (!existsSync(TEST_DIR)) mkdirSync(TEST_DIR, { recursive: true })
 
-    const { writeAuthKey } = await import("./auth.ts")
+    const { writeAuthKey } = await import("./lib/auth.ts")
     writeAuthKey("nvidia", "nvapi-xxx")
 
     expect(existsSync(AUTH_FILE)).toBe(true)
@@ -30,7 +30,7 @@ describe("auth.ts", () => {
     Bun.env.OPENCODE_CONFIG_DIR = TEST_DIR
     if (!existsSync(TEST_DIR)) mkdirSync(TEST_DIR, { recursive: true })
 
-    const { writeAuthKey } = await import("./auth.ts")
+    const { writeAuthKey } = await import("./lib/auth.ts")
     writeAuthKey("nvidia", "old")
     writeAuthKey("nvidia", "new")
     
@@ -42,7 +42,7 @@ describe("auth.ts", () => {
     Bun.env.OPENCODE_CONFIG_DIR = TEST_DIR
     if (!existsSync(TEST_DIR)) mkdirSync(TEST_DIR, { recursive: true })
 
-    const { writeAuthKey, removeAuthKey } = await import("./auth.ts")
+    const { writeAuthKey, removeAuthKey } = await import("./lib/auth.ts")
     writeAuthKey("nvidia", "nvapi-xxx")
     removeAuthKey("nvidia")
 
@@ -55,7 +55,7 @@ describe("auth.ts", () => {
     Bun.env.OPENCODE_CONFIG_DIR = TEST_DIR
     if (!existsSync(TEST_DIR)) mkdirSync(TEST_DIR, { recursive: true })
 
-    const { writeAuthKey, removeAuthKey } = await import("./auth.ts")
+    const { writeAuthKey, removeAuthKey } = await import("./lib/auth.ts")
     writeAuthKey("nvidia", "nvapi-xxx")
     removeAuthKey("openrouter")
 
@@ -68,7 +68,7 @@ describe("auth.ts", () => {
     Bun.env.OPENCODE_CONFIG_DIR = TEST_DIR
     if (!existsSync(TEST_DIR)) mkdirSync(TEST_DIR, { recursive: true })
 
-    const { writeAuthKey } = await import("./auth.ts")
+    const { writeAuthKey } = await import("./lib/auth.ts")
     writeAuthKey("openai", "sk-xxx")
 
     expect(existsSync(AUTH_FILE)).toBe(true)
@@ -78,7 +78,7 @@ describe("auth.ts", () => {
     cleanup()
     Bun.env.OPENCODE_CONFIG_DIR = TEST_DIR
 
-    const { removeAuthKey } = await import("./auth.ts")
+    const { removeAuthKey } = await import("./lib/auth.ts")
     removeAuthKey("nvidia")
 
     expect(existsSync(AUTH_FILE)).toBe(false)
