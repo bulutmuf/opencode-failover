@@ -1,8 +1,8 @@
 import { tool } from "@opencode-ai/plugin"
 import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey } from "./config.ts"
 import { KeyPool } from "./state.ts"
-import { classify, ErrorAction } from "./classify.ts"
 import { writeAuthKey, removeAuthKey } from "./lib/auth.ts"
+import { installFetchPatch, uninstallFetchPatch, registerProvider } from "./lib/fetch-patch.ts"
 import { existsSync, readFileSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
 import path from "node:path"
@@ -46,15 +46,14 @@ function tuiJsonPath(): string {
 const TUI_PLUGIN_PATH = "./plugins/failover-tui.tsx"
 
 async function autoRegisterTui(input: any): Promise<boolean> {
-  const tuiPath = tuiJsonPath()
-  let tuiConfig: Record<string, unknown> = {}
   try {
-    if (existsSync(tuiPath)) tuiConfig = JSON.parse(readFileSync(tuiPath, "utf-8"))
-  } catch { tuiConfig = {} }
-  const plugins = Array.isArray(tuiConfig.plugin) ? tuiConfig.plugin : []
-  const already = plugins.some((p: unknown) => p === TUI_PLUGIN_PATH || (Array.isArray(p) && p[0] === TUI_PLUGIN_PATH))
-  if (already) return false
-  try {
+    const tuiPath = tuiJsonPath()
+    let tuiConfig: Record<string, unknown> = {}
+    try {
+      if (existsSync(tuiPath)) tuiConfig = JSON.parse(readFileSync(tuiPath, "utf-8"))
+    } catch { tuiConfig = {} }
+    const plugins = Array.isArray(tuiConfig.plugin) ? tuiConfig.plugin : []
+    if (plugins.some((p: unknown) => p === TUI_PLUGIN_PATH || (Array.isArray(p) && p[0] === TUI_PLUGIN_PATH))) return false
     const bakPath = tuiPath + ".bak"
     if (existsSync(tuiPath)) await writeFile(bakPath, readFileSync(tuiPath, "utf-8"))
     tuiConfig.plugin = [...plugins, TUI_PLUGIN_PATH]
@@ -65,8 +64,6 @@ async function autoRegisterTui(input: any): Promise<boolean> {
     return true
   } catch { return false }
 }
-
-const lastUsed = new Map<string, { providerID: string; key: string }>()
 
 function trackAuthKey(providerID: string, key: string): void {
   writeAuthKey(providerID, key)
@@ -83,13 +80,17 @@ export const server = async function(input: any, opts?: unknown) {
   for (const providerID of providerIDs(opts)) {
     const config = validateProviderConfig(providerID, opts)
     pool.register(providerID, config)
+    registerProvider(providerID, { header: config.header, scheme: config.scheme })
     trace(`plugin init: registered ${providerID}`, { keyCount: config.keys.length })
   }
 
+  installFetchPatch(input, pool)
   trace(`plugin init DONE | providers=${pool.allProviderIDs().join(', ') || '(none)'}`)
 
   return {
-    dispose: async () => {},
+    dispose: async () => {
+      uninstallFetchPatch()
+    },
 
     config: async () => {
       const envPath = envFilePath(input.directory)
@@ -102,7 +103,10 @@ export const server = async function(input: any, opts?: unknown) {
       for (const providerID of ids) {
         if (!pool.allProviderIDs().includes(providerID)) {
           const config = loadProviderConfig(providerID, opts)
-          if (config) pool.register(providerID, config)
+          if (config) {
+            pool.register(providerID, config)
+            registerProvider(providerID, { header: config.header, scheme: config.scheme })
+          }
         }
       }
       for (const providerID of pool.allProviderIDs()) {
@@ -114,19 +118,6 @@ export const server = async function(input: any, opts?: unknown) {
           safeToast(input, `opencode-failover: Failover active for ${displayName(providerID)}. /keychain to select model.`, "success")
         }
       }
-    },
-
-    "chat.headers": async (incoming: any, output: any) => {
-      const providerID = incoming.model.providerID
-      const config = loadProviderConfig(providerID, opts)
-      if (!config) return
-      const key = pool.pick(providerID)
-      const headerValue = `${config.scheme} ${key}`
-      output.headers = { ...output.headers, [config.header]: headerValue }
-      if (incoming.sessionID) {
-        lastUsed.set(incoming.sessionID, { providerID, key })
-      }
-      trace(`chat.headers: injected key for ${providerID}`)
     },
 
     tool: {
@@ -180,6 +171,7 @@ export const server = async function(input: any, opts?: unknown) {
           await writeEnvKey(envPath, envKey, merged.join(","))
           Bun.env[envKey] = merged.join(",")
           pool.register(provider, { keys: merged, header: "Authorization", scheme: "Bearer" })
+          registerProvider(provider, { header: "Authorization", scheme: "Bearer" })
           trackAuthKey(provider, merged[0]!)
           log(input, `saved ${newKeys.length} key(s) for ${provider}`)
           safeToast(input, `Saved ${newKeys.length} key(s) for ${displayName(provider)}.`, "success")
@@ -213,6 +205,7 @@ export const server = async function(input: any, opts?: unknown) {
               trackAuthKey(provider, remaining[0]!)
             }
             pool.register(provider, { keys: remaining, header: "Authorization", scheme: "Bearer" })
+            registerProvider(provider, { header: "Authorization", scheme: "Bearer" })
             safeToast(input, `Removed ${existingKeys.length - remaining.length} key(s).`, "success")
             return `Removed ${existingKeys.length - remaining.length} key(s).`
           }
@@ -223,38 +216,6 @@ export const server = async function(input: any, opts?: unknown) {
           return `Removed all keys.`
         },
       }),
-    },
-
-    event: async ({ event }: any) => {
-      if (event.type !== "session.error") return
-      const properties = (event as Record<string, unknown>).properties as Record<string, unknown> | undefined
-      const error = properties?.error as Record<string, unknown> | undefined
-      if (!error) return
-
-      const sessionID = properties?.sessionID as string | undefined
-      const entry = sessionID ? lastUsed.get(sessionID) : undefined
-      if (!entry) return
-
-      const result = classify(error)
-      if (result.action === ErrorAction.Ignore) return
-
-      const { providerID, key } = entry
-      const masked = key.length > 7 ? `${key.slice(0, 4)}...${key.slice(-3)}` : "<key>"
-
-      if (result.action === ErrorAction.Disable) {
-        pool.disable(providerID, key, result.reason)
-        const nextKey = pool.pick(providerID)
-        trackAuthKey(providerID, nextKey)
-        safeToast(input, `opencode-failover: ${displayName(providerID)} key ${masked} disabled — ${result.reason}`, "error")
-      }
-      if (result.action === ErrorAction.Rotate) {
-        pool.quarantine(providerID, key, result.retryAfterMs, result.reason)
-        const nextKey = pool.pick(providerID)
-        trackAuthKey(providerID, nextKey)
-        const maskedNext = nextKey.length > 7 ? `${nextKey.slice(0, 4)}...${nextKey.slice(-3)}` : "<key>"
-        const backoffSec = result.retryAfterMs ? Math.ceil(result.retryAfterMs / 1000) : 60
-        safeToast(input, `opencode-failover: [${displayName(providerID)}] Key ${masked} quarantined. Switching to ${maskedNext} (${backoffSec}s).`, "warning")
-      }
     },
   }
 }
