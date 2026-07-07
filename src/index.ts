@@ -216,6 +216,20 @@ export const server = async function(input: any, opts?: unknown) {
           return `Removed all keys.`
         },
       }),
+
+      "keychain-reset": tool({
+        description: "opencode-failover: Reset all quarantined keys back to active. No arguments.",
+        args: {},
+        async execute() {
+          const reset: string[] = []
+          for (const providerID of pool.allProviderIDs()) {
+            const before = pool.status(providerID).filter(k => k.status !== "active").length
+            pool.resetAll(providerID)
+            reset.push(`${displayName(providerID)}: ${before} keys reset`)
+          }
+          return reset.length > 0 ? `Reset: ${reset.join(", ")}` : "All keys already active."
+        },
+      }),
     },
   }
 }

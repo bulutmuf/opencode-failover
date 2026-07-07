@@ -16,11 +16,11 @@ describe("classify", () => {
     expect(result.retryAfterMs).toBe(3000)
   })
 
-  it("rotates on 429 overloaded", () => {
+  it("detects overload even with 429 status", () => {
     const result = classify({
       data: { statusCode: 429, responseBody: "API overloaded" },
     })
-    expect(result.action).toBe(ErrorAction.Rotate)
+    expect(result.action).toBe(ErrorAction.Overload)
   })
 
   it("disables on 401", () => {
