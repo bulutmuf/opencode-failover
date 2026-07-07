@@ -36,7 +36,7 @@ export function parseEnvProviders(): Map<string, ProviderConfig> {
 }
 
 export function parseEnvKeys(id: string): string[] | null {
-  const json = readKeychainJson(new Map(Object.entries(Bun.env)))
+  const json = readKeychainJson(new Map(Object.entries(Bun.env) as [string, string][]))
   const fromJson = json.get(id)
   if (fromJson) return fromJson
 
@@ -84,7 +84,7 @@ export function loadProviderConfig(
 export function discoverEnvProviders(): Map<string, ProviderConfig> {
   const result = new Map<string, ProviderConfig>()
 
-  const envVars = new Map(Object.entries(Bun.env))
+  const envVars = new Map(Object.entries(Bun.env) as [string, string][])
   for (const [id, keys] of readKeychainJson(envVars)) {
     if (keys.length === 0) continue
     result.set(id, { keys, header: "Authorization", scheme: "Bearer" })
