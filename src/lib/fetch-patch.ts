@@ -34,7 +34,9 @@ function readHeaders(init?: RequestInit): Record<string, string> {
   if (init.headers instanceof Headers) {
     init.headers.forEach((v, k) => { result[k.toLowerCase()] = v })
   } else if (Array.isArray(init.headers)) {
-    for (const [k, v] of init.headers) result[k.toLowerCase()] = String(v)
+    for (const [k, v] of init.headers) {
+      if (k) result[k.toLowerCase()] = String(v)
+    }
   } else {
     for (const [k, v] of Object.entries(init.headers)) result[k.toLowerCase()] = String(v)
   }
@@ -70,7 +72,9 @@ function applyAuth(init: RequestInit | undefined, meta: ProviderMeta, key: strin
     if (init.headers instanceof Headers) {
       init.headers.forEach((v, k) => hdrs.set(k, v))
     } else if (Array.isArray(init.headers)) {
-      for (const [k, v] of init.headers) hdrs.set(k, String(v))
+      for (const [k, v] of init.headers) {
+        if (k) hdrs.set(k, String(v))
+      }
     } else {
       for (const [k, v] of Object.entries(init.headers)) hdrs.set(k, String(v))
     }
@@ -95,7 +99,7 @@ export function installFetchPatch(input: any, pool: KeyPool): void {
   _input = input
   _original = globalThis.fetch.bind(globalThis)
 
-  globalThis.fetch = (async (req: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (req: string | Request | URL, init?: RequestInit) => {
     if (!_original || !_pool) return _original!(req, init)
 
     const hdrs = readHeaders(init)

@@ -239,6 +239,8 @@ export const server = async function(input: any, opts?: unknown) {
 
           const metadata = account_id ? { account_id } : undefined
           trackAuthKey(resolved, merged[0]!, metadata)
+          
+          return `opencode-failover: Successfully saved ${newKeys.length} key(s) for ${resolved}.`
         },
       }),
 
