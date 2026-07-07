@@ -15,6 +15,7 @@ export type ProviderConfig = z.infer<typeof ProviderConfigSchema>
 type Options = Record<string, ProviderConfig>
 
 const PROVIDERS_ENV_KEY = "OPENCODE_FAILOVER_PROVIDERS"
+export const KEYCHAIN_JSON_KEY = "OPENCODE_FAILOVER_KEYS"
 
 export function parseEnvProviders(): Map<string, ProviderConfig> {
   const raw = Bun.env[PROVIDERS_ENV_KEY]
@@ -34,6 +35,10 @@ export function parseEnvProviders(): Map<string, ProviderConfig> {
 }
 
 export function parseEnvKeys(id: string): string[] | null {
+  const json = readKeychainJson(new Map(Object.entries(Bun.env)))
+  const fromJson = json.get(id)
+  if (fromJson) return fromJson
+
   const upcase = id.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()
   const raw = Bun.env[`${upcase}_API_KEYS`]
   if (!raw) return null
@@ -77,16 +82,68 @@ export function loadProviderConfig(
 
 export function discoverEnvProviders(): Map<string, ProviderConfig> {
   const result = new Map<string, ProviderConfig>()
+
+  const envVars = new Map(Object.entries(Bun.env))
+  for (const [id, keys] of readKeychainJson(envVars)) {
+    if (keys.length === 0) continue
+    result.set(id, { keys, header: "Authorization", scheme: "Bearer" })
+  }
+
   for (const [key, value] of Object.entries(Bun.env)) {
     if (!key.endsWith("_API_KEYS")) continue
-    if (key === PROVIDERS_ENV_KEY) continue
+    if (key === PROVIDERS_ENV_KEY || key === KEYCHAIN_JSON_KEY) continue
     const providerID = key.slice(0, -"_API_KEYS".length).toLowerCase()
-    if (!value) continue
+    if (!value || result.has(providerID)) continue
     const keys = value.split(",").map((k) => k.trim()).filter(Boolean)
     if (keys.length === 0) continue
     result.set(providerID, { keys, header: "Authorization", scheme: "Bearer" })
   }
   return result
+}
+
+export function readKeychainJson(envVars: Map<string, string>): Map<string, string[]> {
+  const result = new Map<string, string[]>()
+  const raw = envVars.get(KEYCHAIN_JSON_KEY)
+  if (!raw) return result
+  try {
+    const parsed = JSON.parse(raw) as Record<string, string[]>
+    for (const [id, keys] of Object.entries(parsed)) {
+      if (Array.isArray(keys)) result.set(id, keys.filter((k) => typeof k === "string" && k.length > 0))
+    }
+  } catch {}
+  return result
+}
+
+export function discoverJsonProviders(envVars: Map<string, string>): Map<string, ProviderConfig> {
+  const result = new Map<string, ProviderConfig>()
+  for (const [id, keys] of readKeychainJson(envVars)) {
+    if (keys.length === 0) continue
+    result.set(id, { keys, header: "Authorization", scheme: "Bearer" })
+  }
+  return result
+}
+
+export async function writeKeychainJson(filePath: string, providers: Map<string, string[]>): Promise<void> {
+  const obj: Record<string, string[]> = {}
+  for (const [id, keys] of providers) { if (keys.length > 0) obj[id] = keys }
+  await writeEnvKey(filePath, KEYCHAIN_JSON_KEY, JSON.stringify(obj))
+}
+
+export async function migrateLegacyKeys(filePath: string): Promise<Map<string, string[]>> {
+  const envVars = readEnvFile(filePath)
+  const json = readKeychainJson(envVars)
+  const legacy = new Map<string, string[]>()
+  for (const [key, value] of envVars) {
+    if (!key.endsWith("_API_KEYS")) continue
+    if (key === PROVIDERS_ENV_KEY || key === KEYCHAIN_JSON_KEY) continue
+    const id = key.slice(0, -"_API_KEYS".length).toLowerCase()
+    const keys = value.split(",").map((k) => k.trim()).filter(Boolean)
+    if (keys.length > 0 && !json.has(id)) legacy.set(id, keys)
+  }
+  if (legacy.size > 0) {
+    await writeKeychainJson(filePath, new Map([...json, ...legacy]))
+  }
+  return new Map([...json, ...legacy])
 }
 
 export function providerIDs(opts?: unknown): string[] {
