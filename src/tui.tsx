@@ -40,15 +40,27 @@ function readSharedState(): SharedState | null {
 
 async function switchToModel(api: any, providerID: string, modelID: string, label: string) {
   try {
-    const list: any = await api.client.session.list({})
-    const sessions: any[] = list?.data ?? []
-    const active = sessions.find((s: any) => s.status === "active" || s.status === "idle")
-    if (!active) {
+    const current = api.route.current
+    let sessionID = ""
+
+    if (current.name === "session") {
+      sessionID = current.params.sessionID
+    }
+
+    if (!sessionID) {
+      try {
+        const active: any = await api.client.v2.session.active({})
+        sessionID = active?.data?.[0]?.id ?? ""
+      } catch {}
+    }
+
+    if (!sessionID) {
       api.ui.toast({ message: "opencode-failover: No active session found.", variant: "warning", duration: 5000 })
       return
     }
+
     await api.client.v2.session.switchModel({
-      sessionID: active.id,
+      sessionID,
       model: { id: modelID, providerID },
     })
     api.ui.toast({ message: `opencode-failover: Switched to ${label}`, variant: "success", duration: 3000 })
