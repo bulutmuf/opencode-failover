@@ -38,15 +38,23 @@ function readSharedState(): SharedState | null {
   catch { return null }
 }
 
-// ponytail: keystroke injection — opencode's TUI plugin API
-// does not expose local.model.set(). Keystroke injection through
-// the built-in model.list dialog is the only known workaround
-// (same approach used by @thelioo/opencode-balancer).
-function feedKeystrokes(api: TuiPluginApi, text: string, delay: number): void {
-  setTimeout(() => {
-    const stdin = (api.renderer as unknown as { stdin?: { emit: (e: string, d: unknown) => unknown } }).stdin
-    stdin?.emit("data", Buffer.from(text))
-  }, delay)
+async function switchToModel(api: any, providerID: string, modelID: string, label: string) {
+  try {
+    const list: any = await api.client.session.list({})
+    const sessions: any[] = list?.data ?? []
+    const active = sessions.find((s: any) => s.status === "active" || s.status === "idle")
+    if (!active) {
+      api.ui.toast({ message: "opencode-failover: No active session found.", variant: "warning", duration: 5000 })
+      return
+    }
+    await api.client.v2.session.switchModel({
+      sessionID: active.id,
+      model: { id: modelID, providerID },
+    })
+    api.ui.toast({ message: `opencode-failover: Switched to ${label}`, variant: "success", duration: 3000 })
+  } catch (e) {
+    api.ui.toast({ message: `opencode-failover: switchModel failed: ${String(e)}`, variant: "error", duration: 5000 })
+  }
 }
 
 const tui: TuiPlugin = async (api) => {
@@ -87,7 +95,7 @@ const tui: TuiPlugin = async (api) => {
         const title = (m as Record<string, string>).name ?? mid
         options.push({
           title,
-          value: { providerID: p.id, modelID: mid, label: title },
+          value: { providerID: p.id, modelID: mid, label: title, providerName: name },
           description: name,
           category,
         })
@@ -108,16 +116,10 @@ const tui: TuiPlugin = async (api) => {
       title: "Keychain — Select Model",
       placeholder: "Search models...",
       options,
-      onSelect(opt: { value: { providerID: string; modelID: string; label: string } }) {
-        const { label } = opt.value
+      onSelect(opt: { value: { providerID: string; modelID: string; label: string; providerName: string } }) {
+        const { providerID, modelID, label } = opt.value
         api.ui.dialog.clear()
-
-        setTimeout(() => {
-          api.keymap.dispatchCommand("model.list")
-          feedKeystrokes(api, label, 150)
-          feedKeystrokes(api, "\r", 230)
-          feedKeystrokes(api, "\x1b", 310)
-        }, 50)
+        void switchToModel(api, providerID, modelID, label)
       },
     }))
   }
