@@ -25,7 +25,7 @@ function authFilePath(): string {
   return path.join(base, ".local", "share", "opencode", "auth.json")
 }
 
-function readAuth(): Record<string, AuthEntry> {
+export function readAuth(): Record<string, AuthEntry> {
   const p = authFilePath()
   if (!existsSync(p)) return {}
   try {

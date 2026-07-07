@@ -128,15 +128,24 @@ export const server = async function(input: any, opts?: unknown) {
       const envPath = envFilePath(input.directory)
       trace(`config hook fired | envPath=${envPath}`)
       await migrateLegacyKeys(envPath)
+      
       const imported = await importFromAuthJson(envPath)
-      for (const [id, { keys, metadata }] of imported) {
-        if (!pool.allProviderIDs().includes(id)) {
-          const config = { keys: keys, header: "Authorization", scheme: "Bearer" }
-          pool.register(id, config)
-          registerProvider(id, { header: "Authorization", scheme: "Bearer" })
+      if (imported.size > 0) {
+        let changed = false
+        const currentJson = readKeychainJson(envPath)
+        for (const [id, { keys, metadata }] of imported) {
+          if (!currentJson[id]) {
+            currentJson[id] = { keys, metadata }
+            changed = true
+          }
         }
-        if (keys[0]) trackAuthKey(id, keys[0], metadata)
+        if (changed) {
+          await writeKeychainJson(envPath, currentJson)
+          Bun.env[KEYCHAIN_JSON_KEY] = JSON.stringify(currentJson)
+          trace(`config: imported native auth keys to keychain JSON`)
+        }
       }
+
       const envVars = readEnvFile(envPath)
       for (const [key, value] of envVars) {
         if (!Bun.env[key]) Bun.env[key] = value
