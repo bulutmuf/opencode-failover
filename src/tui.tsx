@@ -11,6 +11,8 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   fireworks: "Fireworks AI", perplexity: "Perplexity", anyscale: "Anyscale",
   replicate: "Replicate", aws: "AWS Bedrock", azure: "Azure OpenAI",
   cloudflare: "Cloudflare Workers AI",
+  "cloudflare-workers-ai": "Cloudflare Workers AI",
+  "cloudflare-ai-gateway": "Cloudflare AI Gateway",
 }
 
 function displayName(id: string): string {
