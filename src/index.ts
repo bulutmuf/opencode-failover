@@ -97,8 +97,8 @@ async function autoRegisterTui(input: any): Promise<boolean> {
   } catch { return false }
 }
 
-function trackAuthKey(providerID: string, key: string): void {
-  writeAuthKey(providerID, key)
+function trackAuthKey(providerID: string, key: string, metadata?: Record<string, string>): void {
+  writeAuthKey(providerID, key, metadata)
 }
 
 function clearAuthKey(providerID: string): void {
@@ -188,12 +188,13 @@ export const server = async function(input: any, opts?: unknown) {
       }),
 
       "keychain-setup": tool({
-        description: "opencode-failover: Save API keys for a provider. Extract provider and keys from the message.",
+        description: "opencode-failover: Save API keys for a provider. For Cloudflare Workers AI, include account_id param. Extract provider, keys, and optional account_id from the message.",
         args: {
-          provider: tool.schema.string().describe("Provider name, e.g. nvidia, openrouter"),
+          provider: tool.schema.string().describe("Provider name, e.g. nvidia, openrouter, cloudflare"),
           keys: tool.schema.string().describe("Comma-separated API keys, e.g. nvapi-xxx,nvapi-yyy"),
+          account_id: tool.schema.string().optional().describe("Cloudflare Workers AI account ID (optional, only needed for cloudflare/cloudflare-workers-ai)"),
         },
-        async execute({ provider, keys }: { provider: string; keys: string }) {
+        async execute({ provider, keys, account_id }: { provider: string; keys: string; account_id?: string }) {
           const envPath = envFilePath(input.directory)
           const resolved = resolveProvider(provider)
           const newKeys = keys.split(",").map((k) => k.trim()).filter(Boolean)
@@ -211,9 +212,11 @@ export const server = async function(input: any, opts?: unknown) {
           Bun.env[envKey] = merged.join(",")
           Bun.env[KEYCHAIN_JSON_KEY] = JSON.stringify(Object.fromEntries(json))
 
+          const metadata = account_id ? { account_id } : undefined
+          trackAuthKey(resolved, merged[0]!, metadata)
+
           pool.register(resolved, { keys: merged, header: "Authorization", scheme: "Bearer" })
           registerProvider(resolved, { header: "Authorization", scheme: "Bearer" })
-          trackAuthKey(resolved, merged[0]!)
           log(input, `saved ${newKeys.length} key(s) for ${resolved}`)
           safeToast(input, `Saved ${newKeys.length} key(s) for ${displayName(resolved)}.`, "success")
           return `Saved ${newKeys.length} key(s) for ${displayName(resolved)}. Total: ${merged.length} in ${envPath}.`

@@ -35,7 +35,7 @@ function readAuth(): Record<string, AuthEntry> {
   }
 }
 
-export function writeAuthKey(providerID: string, key: string): void {
+export function writeAuthKey(providerID: string, key: string, metadata?: Record<string, string>): void {
   const p = authFilePath()
   const dir = path.dirname(p)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
@@ -44,7 +44,8 @@ export function writeAuthKey(providerID: string, key: string): void {
   all[providerID] = {
     type: existing?.type ?? "api",
     key,
-    ...(existing?.metadata ? { metadata: existing.metadata } : {}),
+    ...(metadata ? { metadata } : {}),
+    ...(existing?.metadata && !metadata ? { metadata: existing.metadata } : {}),
     ...(existing?.accountId ? { accountId: existing.accountId } : {}),
     ...(existing?.token ? { token: existing.token } : {}),
     ...(existing?.refresh ? { refresh: existing.refresh } : {}),
