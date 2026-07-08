@@ -75,7 +75,7 @@ function tuiJsonPath(): string {
   return path.join(configDir, "tui.json")
 }
 
-const TUI_PLUGIN_PATH = "./plugins/failover-tui.tsx"
+const TUI_PLUGIN_PATH = "./plugins/tui.tsx"
 
 async function autoRegisterTui(input: any): Promise<boolean> {
   try {
@@ -127,6 +127,7 @@ export const server = async function(input: any, opts?: unknown) {
     config: async () => {
       const envPath = envFilePath(input.directory)
       trace(`config hook fired | envPath=${envPath}`)
+      try { await autoRegisterTui(input) } catch (e) { trace(`autoRegisterTui failed: ${e}`) }
       try { await migrateLegacyKeys(envPath) } catch (e) { trace(`migrateLegacyKeys failed: ${e}`) }
       
       try {
