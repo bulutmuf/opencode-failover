@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test"
 import { existsSync, mkdirSync, rmSync } from "node:fs"
 import path from "node:path"
-import { KeyPool } from "./state.ts"
+import { KeyPool } from "./lib/state.ts"
 
 const TEST_DIR = "C:\\Users\\Burak\\AppData\\Local\\Temp\\opencode_state_test"
 

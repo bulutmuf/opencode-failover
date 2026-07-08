@@ -1,4 +1,4 @@
-import { classify, ErrorAction } from "./classify.ts"
+import { classify, ErrorAction } from "./lib/classify.ts"
 
 describe("classify", () => {
   it("ignores non-retryable 400", () => {

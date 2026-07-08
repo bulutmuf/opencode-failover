@@ -2,7 +2,7 @@ import { z } from "zod"
 import { existsSync, readFileSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
 import path from "node:path"
-import { readAuth } from "./lib/auth.ts"
+import { readAuth } from "./auth.ts"
 
 const ProviderConfigSchema = z.object({
   keys: z.array(z.string().min(1)).min(1),
