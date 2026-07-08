@@ -1,5 +1,5 @@
-import type { KeyPool } from "../state.ts"
-import { classify, ErrorAction } from "../classify.ts"
+import type { KeyPool } from "./state.ts"
+import { classify, ErrorAction } from "./classify.ts"
 import { writeAuthKey } from "./auth.ts"
 
 const RETRYABLE = new Set([429, 500, 502, 503, 504, 529])

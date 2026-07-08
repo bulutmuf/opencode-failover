@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test"
-import { discoverEnvProviders, providerIDs } from "./config.ts"
+import { discoverEnvProviders, providerIDs } from "./lib/config.ts"
 
 describe("discoverEnvProviders", () => {
   beforeEach(() => {

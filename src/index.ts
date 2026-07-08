@@ -1,6 +1,6 @@
 import { tool } from "@opencode-ai/plugin"
-import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey, KEYCHAIN_JSON_KEY, readKeychainJson, writeKeychainJson, migrateLegacyKeys, importFromAuthJson } from "./config.ts"
-import { KeyPool } from "./state.ts"
+import { loadProviderConfig, validateProviderConfig, providerIDs, envFilePath, readEnvFile, writeEnvKey, removeEnvKey, KEYCHAIN_JSON_KEY, readKeychainJson, writeKeychainJson, migrateLegacyKeys, importFromAuthJson } from "./lib/config.ts"
+import { KeyPool } from "./lib/state.ts"
 import { writeAuthKey, removeAuthKey } from "./lib/auth.ts"
 import { installFetchPatch, uninstallFetchPatch, registerProvider } from "./lib/fetch-patch.ts"
 import { existsSync, readFileSync } from "node:fs"
