@@ -138,15 +138,15 @@ const tui: TuiPlugin = async (api) => {
       placeholder: "Search models...",
       options,
       onSelect(opt: ModelOption) {
-        const { label, providerName } = opt.value
+        const { label, providerID } = opt.value
         api.ui.dialog.clear()
 
+        const searchPrefix = providerID.split("-")[0]
         setTimeout(() => {
           api.keymap.dispatchCommand("model.list")
-          feedKeystrokes(api, providerName, 0)
-          feedKeystrokes(api, ` ${label}`, 5)
-          feedKeystrokes(api, "\r", 10)
-        }, 0)
+          feedKeystrokes(api, `${searchPrefix} ${label}`, 150)
+          feedKeystrokes(api, "\r", 160)
+        }, 150)
       },
     }))
   }
