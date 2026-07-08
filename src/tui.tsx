@@ -75,26 +75,33 @@ const tui: TuiPlugin = async (api) => {
     }
 
     let providerData: Array<{ id: string; models: Record<string, { name?: string }> }> = []
+    const stateProviders = (api.state.provider && api.state.provider.length > 0)
+      ? [...api.state.provider] as typeof providerData
+      : null
+
     if (cachedProviderData) {
       const cachedIds = new Set(cachedProviderData.map((p: any) => p.id))
       const missing = [...keychainIds].filter((id) => !cachedIds.has(id))
-      if (missing.length > 0) {
-        cachedProviderData = null
-      }
+      if (missing.length > 0) cachedProviderData = null
     }
+
     if (cachedProviderData) {
       providerData = cachedProviderData as typeof providerData
+    } else if (stateProviders) {
+      providerData = stateProviders
+      cachedProviderData = stateProviders
     } else {
       try {
         const res = await api.client.provider.list({})
         const resp = res as { data?: { all?: unknown[] } }
         providerData = (resp.data?.all as typeof providerData) ?? []
       } catch (e) {
-        providerData = [...api.state.provider] as typeof providerData
+        providerData = []
       }
       cachedProviderData = providerData
     }
-    const options: Array<{ title: string; value: unknown; description: string; category: string }> = []
+    type ModelOption = { title: string; value: { providerID: string; modelID: string; label: string; providerName: string }; description?: string; category?: string }
+    const options: ModelOption[] = []
 
     for (const p of providerData) {
       if (!keychainIds.has(p.id)) continue
@@ -130,16 +137,16 @@ const tui: TuiPlugin = async (api) => {
       title: "Keychain — Select Model",
       placeholder: "Search models...",
       options,
-      onSelect(opt: { value: { providerID: string; modelID: string; label: string; providerName: string } }) {
-        const { label, providerID } = opt.value
+      onSelect(opt: ModelOption) {
+        const { label, providerName } = opt.value
         api.ui.dialog.clear()
 
         setTimeout(() => {
           api.keymap.dispatchCommand("model.list")
-          feedKeystrokes(api, providerID, 80)
-          feedKeystrokes(api, ` ${label}`, 160)
-          feedKeystrokes(api, "\r", 260)
-        }, 30)
+          feedKeystrokes(api, providerName, 0)
+          feedKeystrokes(api, ` ${label}`, 5)
+          feedKeystrokes(api, "\r", 10)
+        }, 0)
       },
     }))
   }
