@@ -75,7 +75,8 @@ function tuiJsonPath(): string {
   return path.join(configDir, "tui.json")
 }
 
-const TUI_PLUGIN_PATH = "./plugins/tui.tsx"
+const isNpm = import.meta.dir ? import.meta.dir.includes("node_modules") : false
+const TUI_PLUGIN_PATH = isNpm ? "opencode-failover/tui" : "./plugins/tui.tsx"
 
 async function autoRegisterTui(input: any): Promise<boolean> {
   try {
