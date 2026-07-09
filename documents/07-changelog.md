@@ -68,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Native API key backup/restore**: When keychain keys exist for a provider, the plugin reads opencode's `auth.json`, backs up the native API key (in-memory), and removes it.
-- **Auth utils**: `src/auth.ts` with graceful handling of missing/corrupt `auth.json`.
+- **Auth utils**: `src/lib/auth.ts` with graceful handling of missing/corrupt `auth.json`.
 - **Auth tests**: 12 tests for auth.json operations.
 
 ### Fixed

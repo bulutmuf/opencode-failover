@@ -24,7 +24,7 @@ NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"
 NVIDIA_API_KEYS="nvapi-xxx,nvapi-yyy,nvapi-zzz"
 ```
 
-**Option 2: opencode.json**
+**Option 3: opencode.json**
 
 ```json
 {

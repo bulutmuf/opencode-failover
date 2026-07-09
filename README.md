@@ -131,10 +131,12 @@ cd opencode-failover
 bun install
 ```
 
-Then copy the plugin to your OpenCode [plugins directory](https://opencode.ai/docs/plugins):
+Then configure OpenCode to load it from the source directory. Add to your `opencode.json`:
 
-```bash
-cp src/index.ts ~/.config/opencode/plugins/failover.ts
+```json
+{
+  "plugin": ["/path/to/opencode-failover/src/index.ts"]
+}
 ```
 
 ## Configuration
@@ -310,15 +312,15 @@ Logs key injection, quarantine decisions, and provider pool initialization.
 ```
 src/
   index.ts          Plugin factory: hooks wiring + tools
-  config.ts         Env + options parser
-  state.ts          KeyPool: rotation, quarantine, backoff
-  classify.ts       Error classifier: status/body -> action
   lib/
-    auth.ts         Native key backup/restore from auth.json
-    fetch-patch.ts  Global fetch monkey-patch interceptor
-  shared.ts         Masked state file (~/.opencode/failover-state.json)
-  version-check.ts  npm registry poll for new versions
-  tui.tsx           TUI dashboard: /keychain slash command
+    config.ts         Env + options parser
+    state.ts          KeyPool: rotation, quarantine, backoff
+    classify.ts       Error classifier: status/body -> action
+    auth.ts           Native key backup/restore from auth.json
+    fetch-patch.ts    Global fetch monkey-patch interceptor
+    shared.ts         Masked state file (~/.opencode/failover-state.json)
+    version-check.ts  npm registry poll for new versions
+    tui.tsx           TUI dashboard: /keychain slash command
   state.test.ts     7 tests
   classify.test.ts  19 tests
   config.test.ts    7 tests

@@ -57,9 +57,9 @@ type(scope): summary
 
 | Scope | Use for |
 |---|---|
-| `config` | Configuration parsing (`src/config.ts`) |
-| `state` | Key pool logic (`src/state.ts`) |
-| `classify` | Error classification (`src/classify.ts`) |
+| `config` | Configuration parsing (`src/lib/config.ts`) |
+| `state` | Key pool logic (`src/lib/state.ts`) |
+| `classify` | Error classification (`src/lib/classify.ts`) |
 | `hooks` | Plugin hook wiring (`src/index.ts` chat.headers, event) |
 | `tool` | `keychain-status` tool |
 | `ci` | GitHub Actions workflows |
@@ -82,8 +82,8 @@ chore: bump @opencode-ai/plugin to 1.17.14
 All new logic gets a `*.test.ts` file adjacent to the source:
 
 ```
-src/state.ts       → src/state.test.ts
-src/classify.ts    → src/classify.test.ts
+src/lib/state.ts       → src/state.test.ts
+src/lib/classify.ts    → src/classify.test.ts
 ```
 
 Tests are table-driven:

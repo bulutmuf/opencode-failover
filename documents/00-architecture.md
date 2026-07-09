@@ -43,13 +43,13 @@ OpenCode's internal router uses Node's standard `fetch` API. Earlier versions of
   The `fetch` interceptor. Responsible for matching keys and invoking the classifier on responses.
 - **`lib/auth.ts`**
   Handles backup and restoration of OpenCode's native keys in `~/.local/share/opencode/auth.json`.
-- **`config.ts`**
+- **`lib/config.ts`**
   Environment variables parser. Scans for `<PROVIDER>_API_KEYS` and processes the unified `OPENCODE_FAILOVER_PROVIDERS` JSON.
-- **`state.ts` (KeyPool)**
+- **`lib/state.ts` (KeyPool)**
   The brain. Holds keys, weights, and quarantine timers. Exposes `next()`, `quarantine()`, and `status()`.
-- **`classify.ts`**
+- **`lib/classify.ts`**
   Pure functions parsing HTTP status codes and response bodies (e.g. Anthropic/OpenAI specific JSON formats) into normalized `ErrorAction`s.
-- **`tui.tsx`**
+- **`lib/tui.tsx`**
   Interactive CLI dashboard (the `/keychain` slash command) displaying live key rotation statuses.
 
 ## Storage and Persistence
